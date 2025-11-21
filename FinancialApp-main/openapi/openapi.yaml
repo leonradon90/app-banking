@@ -1,0 +1,211 @@
+openapi: 3.1.0
+info:
+  title: Digital Banking Core API
+  version: 1.0.0
+  description: >-
+    Event-driven digital banking MVP implementing accounts, payments, ledger,
+    card controls, notifications, limits, and KYC services.
+servers:
+  - url: http://localhost:3000/api/v1
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDto'
+      responses:
+        '201':
+          description: Registered
+  /auth/login:
+    post:
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: Authenticated
+  /accounts:
+    get:
+      summary: List accounts for current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Accounts
+    post:
+      summary: Create account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountDto'
+      responses:
+        '201':
+          description: Created
+  /accounts/{id}:
+    get:
+      summary: Get account by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Account
+  /payments:
+    post:
+      summary: Create payment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentDto'
+      responses:
+        '200':
+          description: Payment accepted
+  /ledger/{accountId}:
+    get:
+      summary: Get ledger entries for account
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Ledger entries
+  /notifications/preferences:
+    get:
+      summary: Get notification preferences
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Preference
+    post:
+      summary: Update notification preferences
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferenceDto'
+      responses:
+        '200':
+          description: Updated
+  /card-controls/{cardToken}/freeze:
+    post:
+      summary: Freeze card
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FreezeCardDto'
+      responses:
+        '200':
+          description: Frozen
+  /card-controls/{cardToken}/unfreeze:
+    post:
+      summary: Unfreeze card
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Unfrozen
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    RegisterDto:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+      required: [email, password]
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+    CreateAccountDto:
+      type: object
+      properties:
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        initialBalance:
+          type: number
+          minimum: 0
+      required: [currency]
+    CreatePaymentDto:
+      type: object
+      properties:
+        fromAccount:
+          type: integer
+        toAccount:
+          type: integer
+        amount:
+          type: number
+          minimum: 0.01
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        idempotencyKey:
+          type: string
+          format: uuid
+        description:
+          type: string
+      required: [fromAccount, toAccount, amount, currency, idempotencyKey]
+    NotificationPreferenceDto:
+      type: object
+      properties:
+        channels:
+          type: object
+          additionalProperties:
+            type: boolean
+      required: [channels]
+    FreezeCardDto:
+      type: object
+      properties:
+        reason:
+          type: string
+      required: [reason]
