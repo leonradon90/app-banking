@@ -3,11 +3,14 @@ import {
   CreateDateColumn,
   Entity,
   OneToMany,
+  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Account } from '../../accounts/entities/account.entity';
 import { KycStatus } from '../../kyc/kyc-status.enum';
+import { LimitRule } from '../../limits/entities/limit-rule.entity';
+import { NotificationPreference } from '../../notifications/entities/notification-preference.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -28,6 +31,12 @@ export class User {
 
   @OneToMany(() => Account, (account) => account.user)
   accounts!: Account[];
+
+  @OneToMany(() => LimitRule, (limitRule) => limitRule.user)
+  limitRules!: LimitRule[];
+
+  @OneToOne(() => NotificationPreference, (preference) => preference.user)
+  notificationPreference?: NotificationPreference;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

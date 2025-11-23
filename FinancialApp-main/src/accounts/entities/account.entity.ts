@@ -11,6 +11,8 @@ import {
 } from 'typeorm';
 import { User } from '../../auth/entities/user.entity';
 import { LedgerEntry } from '../../ledger/entities/ledger-entry.entity';
+import { CardControl } from '../../card-controls/entities/card-control.entity';
+import { LimitRule } from '../../limits/entities/limit-rule.entity';
 
 export enum AccountStatus {
   ACTIVE = 'ACTIVE',
@@ -44,6 +46,12 @@ export class Account {
 
   @OneToMany(() => LedgerEntry, (entry) => entry.creditAccount)
   creditEntries!: LedgerEntry[];
+
+  @OneToMany(() => CardControl, (cardControl) => cardControl.account)
+  cardControls!: CardControl[];
+
+  @OneToMany(() => LimitRule, (limitRule) => limitRule.account)
+  limitRules!: LimitRule[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

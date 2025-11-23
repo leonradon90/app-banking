@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class InitMigration001 implements MigrationInterface {
-  name = 'InitMigration001';
+export class InitMigration0011700000000000 implements MigrationInterface {
+  name = 'InitMigration0011700000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
@@ -30,7 +30,7 @@ export class InitMigration001 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE accounts (
         id SERIAL PRIMARY KEY,
-        user_id INT REFERENCES users(id),
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
         currency VARCHAR(3) DEFAULT 'USD',
         balance NUMERIC(14,2) DEFAULT 0,
         status account_status DEFAULT 'ACTIVE',
@@ -42,8 +42,8 @@ export class InitMigration001 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE ledger_entries (
         id SERIAL PRIMARY KEY,
-        debit_account INT REFERENCES accounts(id),
-        credit_account INT REFERENCES accounts(id),
+        debit_account INT REFERENCES accounts(id) ON DELETE RESTRICT,
+        credit_account INT REFERENCES accounts(id) ON DELETE RESTRICT,
         amount NUMERIC(14,2) NOT NULL,
         currency VARCHAR(3) NOT NULL,
         idempotency_key UUID UNIQUE NOT NULL,
@@ -64,7 +64,7 @@ export class InitMigration001 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE notification_preferences (
         id SERIAL PRIMARY KEY,
-        user_id INT REFERENCES users(id) UNIQUE,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE UNIQUE,
         channels JSONB DEFAULT '{}'::jsonb,
         event_preferences JSONB DEFAULT '{}'::jsonb
       );
@@ -72,7 +72,7 @@ export class InitMigration001 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE card_controls (
         id SERIAL PRIMARY KEY,
-        account_id INT REFERENCES accounts(id),
+        account_id INT REFERENCES accounts(id) ON DELETE CASCADE,
         card_token VARCHAR(255) UNIQUE NOT NULL,
         status card_status DEFAULT 'ACTIVE',
         mcc_whitelist JSONB DEFAULT '[]'::jsonb,
@@ -85,8 +85,8 @@ export class InitMigration001 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE limit_rules (
         id SERIAL PRIMARY KEY,
-        account_id INT REFERENCES accounts(id),
-        user_id INT REFERENCES users(id),
+        account_id INT REFERENCES accounts(id) ON DELETE CASCADE,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
         scope limit_scope NOT NULL,
         threshold NUMERIC(14,2) NOT NULL,
         mcc INT,
@@ -94,6 +94,50 @@ export class InitMigration001 implements MigrationInterface {
         active BOOLEAN DEFAULT true,
         created_at TIMESTAMP DEFAULT NOW()
       );
+    `);
+
+    // Создание индексов для улучшения производительности
+    await queryRunner.query(`
+      CREATE INDEX idx_accounts_user_id ON accounts(user_id);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_ledger_entries_debit_account ON ledger_entries(debit_account);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_ledger_entries_credit_account ON ledger_entries(credit_account);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_ledger_entries_idempotency_key ON ledger_entries(idempotency_key);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_ledger_entries_trace_id ON ledger_entries(trace_id);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_ledger_entries_created_at ON ledger_entries(created_at);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_audit_log_actor ON audit_log(actor);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_audit_log_action ON audit_log(action);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_audit_log_created_at ON audit_log(created_at);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_card_controls_account_id ON card_controls(account_id);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_card_controls_card_token ON card_controls(card_token);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_limit_rules_account_id ON limit_rules(account_id);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_limit_rules_user_id ON limit_rules(user_id);
+    `);
+    await queryRunner.query(`
+      CREATE INDEX idx_limit_rules_active ON limit_rules(active);
     `);
   }
 
