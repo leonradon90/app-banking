@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import configuration from '../common/config/configuration';
-import { InitMigration001 } from './migrations/001-init';
+import { InitMigration0011700000000000 } from './migrations/001-init';
 
 const config = configuration();
 
@@ -15,5 +15,5 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: false,
   entities: ['dist/**/*.entity.js', 'src/**/*.entity.ts'],
-  migrations: [InitMigration001],
+  migrations: [InitMigration0011700000000000],
 });

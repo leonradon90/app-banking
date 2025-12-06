@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { LedgerEntry } from './entities/ledger-entry.entity';
 import { LedgerService } from './ledger.service';
+import { IdempotencyService } from './idempotency.service';
 import { AccountsModule } from '../accounts/accounts.module';
 import { AuditModule } from '../audit/audit.module';
 import { EventsModule } from '../events/events.module';
@@ -14,8 +15,8 @@ import { LedgerController } from './ledger.controller';
     AuditModule,
     EventsModule,
   ],
-  providers: [LedgerService],
+  providers: [LedgerService, IdempotencyService],
   controllers: [LedgerController],
-  exports: [LedgerService],
+  exports: [LedgerService, IdempotencyService],
 })
 export class LedgerModule {}
