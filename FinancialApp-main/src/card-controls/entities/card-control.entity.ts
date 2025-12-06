@@ -2,12 +2,9 @@ import {
   Column,
   CreateDateColumn,
   Entity,
-  JoinColumn,
-  ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Account } from '../../accounts/entities/account.entity';
 
 export enum CardStatus {
   ACTIVE = 'ACTIVE',
@@ -18,10 +15,6 @@ export enum CardStatus {
 export class CardControl {
   @PrimaryGeneratedColumn()
   id!: number;
-
-  @ManyToOne(() => Account, { nullable: false })
-  @JoinColumn({ name: 'account_id' })
-  account!: Account;
 
   @Column({ name: 'account_id' })
   accountId!: number;
