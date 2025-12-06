@@ -1,5 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsPositive, IsString, IsUUID, Length } from 'class-validator';
+import {
+  IsNumber,
+  IsPositive,
+  IsString,
+  IsUUID,
+  Length,
+  IsOptional,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class CreatePaymentDto {
   @ApiProperty()
@@ -24,5 +33,34 @@ export class CreatePaymentDto {
 
   @ApiProperty({ required: false })
   @IsString()
+  @IsOptional()
   description?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Card token for card transactions',
+  })
+  @IsString()
+  @IsOptional()
+  cardToken?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'MCC (Merchant Category Code) for card transactions',
+  })
+  @IsNumber()
+  @Min(0)
+  @Max(9999)
+  @IsOptional()
+  mcc?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Geolocation code (ISO country code) for card transactions',
+    example: 'US',
+  })
+  @IsString()
+  @Length(2, 3)
+  @IsOptional()
+  geoLocation?: string;
 }
