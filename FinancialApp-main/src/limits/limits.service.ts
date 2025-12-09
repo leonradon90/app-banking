@@ -1,15 +1,17 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { LimitRule, LimitScope } from './entities/limit-rule.entity';
 import { CreatePaymentDto } from '../payments/dto/create-payment.dto';
 import { AuditService } from '../audit/audit.service';
+import { LedgerEntry } from '../ledger/entities/ledger-entry.entity';
 
 @Injectable()
 export class LimitsService {
   constructor(
     @InjectRepository(LimitRule)
     private readonly limitsRepository: Repository<LimitRule>,
+    private readonly dataSource: DataSource,
     private readonly auditService: AuditService,
   ) {}
 
@@ -27,26 +29,105 @@ export class LimitsService {
       )
       .getMany();
 
-    const failingRule = rules.find((rule) => {
-      if (!rule.active) return false;
-      if (rule.scope === LimitScope.PER_TRANSACTION) {
-        return dto.amount > parseFloat(rule.threshold);
-      }
-      return false;
-    });
+    const ledgerRepo = this.dataSource.getRepository(LedgerEntry);
 
-    if (failingRule) {
-      await this.auditService.record(actor, 'LIMIT_REJECTED', {
-        ruleId: failingRule.id,
-        amount: dto.amount,
-      });
-      throw new BadRequestException('Limit exceeded');
+    for (const rule of rules) {
+      if (!rule.active) continue;
+
+      let currentSpent = 0;
+      let threshold = parseFloat(rule.threshold);
+      let wouldExceed = false;
+
+      if (rule.scope === LimitScope.PER_TRANSACTION) {
+        wouldExceed = dto.amount > threshold;
+        if (wouldExceed) {
+          await this.auditService.record(actor, 'LIMIT_REJECTED', {
+            ruleId: rule.id,
+            scope: rule.scope,
+            amount: dto.amount,
+            threshold,
+          });
+          throw new BadRequestException(
+            `Transaction limit exceeded: requested ${dto.amount}, limit ${threshold} ${dto.currency}`,
+          );
+        }
+      }
+
+      if (rule.scope === LimitScope.DAILY) {
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const result = await ledgerRepo
+          .createQueryBuilder('entry')
+          .select('COALESCE(SUM(entry.amount::numeric), 0)', 'total')
+          .where('entry.debit_account = :accountId', { accountId: dto.fromAccount })
+          .andWhere('entry.currency = :currency', { currency: dto.currency })
+          .andWhere('entry.created_at >= :startOfDay', { startOfDay })
+          .getRawOne();
+
+        currentSpent = parseFloat(result?.total || '0');
+        wouldExceed = currentSpent + dto.amount > threshold;
+
+        if (wouldExceed) {
+          await this.auditService.record(actor, 'LIMIT_REJECTED', {
+            ruleId: rule.id,
+            scope: rule.scope,
+            amount: dto.amount,
+            currentSpent,
+            threshold,
+            remaining: threshold - currentSpent,
+          });
+          throw new BadRequestException(
+            `Daily limit exceeded: spent ${currentSpent.toFixed(2)}, requested ${dto.amount}, limit ${threshold} ${dto.currency}. Remaining: ${(threshold - currentSpent).toFixed(2)}`,
+          );
+        }
+      }
+
+      if (rule.scope === LimitScope.MONTHLY) {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const result = await ledgerRepo
+          .createQueryBuilder('entry')
+          .select('COALESCE(SUM(entry.amount::numeric), 0)', 'total')
+          .where('entry.debit_account = :accountId', { accountId: dto.fromAccount })
+          .andWhere('entry.currency = :currency', { currency: dto.currency })
+          .andWhere('entry.created_at >= :startOfMonth', { startOfMonth })
+          .getRawOne();
+
+        currentSpent = parseFloat(result?.total || '0');
+        wouldExceed = currentSpent + dto.amount > threshold;
+
+        if (wouldExceed) {
+          await this.auditService.record(actor, 'LIMIT_REJECTED', {
+            ruleId: rule.id,
+            scope: rule.scope,
+            amount: dto.amount,
+            currentSpent,
+            threshold,
+            remaining: threshold - currentSpent,
+          });
+          throw new BadRequestException(
+            `Monthly limit exceeded: spent ${currentSpent.toFixed(2)}, requested ${dto.amount}, limit ${threshold} ${dto.currency}. Remaining: ${(threshold - currentSpent).toFixed(2)}`,
+          );
+        }
+      }
+
+      if (rule.mcc && dto.mcc && rule.mcc !== dto.mcc) {
+        continue;
+      }
+
+      if (rule.geo && dto.geoLocation && rule.geo !== dto.geoLocation) {
+        continue;
+      }
     }
 
     await this.auditService.record(actor, 'LIMIT_EVALUATED', {
       amount: dto.amount,
       fromAccount: dto.fromAccount,
       toAccount: dto.toAccount,
+      currency: dto.currency,
     });
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CardControl, CardStatus } from './entities/card-control.entity';
@@ -55,6 +55,107 @@ export class CardControlsService {
   async registerCard(accountId: number, cardToken: string) {
     const card = this.cardRepository.create({ accountId, cardToken });
     return this.cardRepository.save(card);
+  }
+
+  async validateCardTransaction(
+    cardToken: string,
+    amount: number,
+    mcc?: number,
+    geoLocation?: string,
+  ) {
+    const card = await this.findByToken(cardToken);
+
+    if (card.status === CardStatus.FROZEN) {
+      await this.auditService.record('system', 'CARD_TRANSACTION_REJECTED', {
+        cardToken,
+        reason: 'CARD_FROZEN',
+        amount,
+        mcc,
+        geoLocation,
+      });
+      throw new BadRequestException('Card is frozen. Transaction cannot be processed.');
+    }
+
+    if (mcc && card.mccWhitelist && card.mccWhitelist.length > 0) {
+      if (!card.mccWhitelist.includes(mcc)) {
+        await this.auditService.record('system', 'CARD_TRANSACTION_REJECTED', {
+          cardToken,
+          reason: 'MCC_NOT_ALLOWED',
+          mcc,
+          allowedMcc: card.mccWhitelist,
+          amount,
+          geoLocation,
+        });
+        throw new BadRequestException(
+          `MCC ${mcc} is not allowed for this card. Allowed MCC codes: ${card.mccWhitelist.join(', ')}`,
+        );
+      }
+    }
+
+    if (geoLocation && card.geoWhitelist && card.geoWhitelist.length > 0) {
+      if (!card.geoWhitelist.includes(geoLocation)) {
+        await this.auditService.record('system', 'CARD_TRANSACTION_REJECTED', {
+          cardToken,
+          reason: 'GEO_NOT_ALLOWED',
+          geoLocation,
+          allowedGeo: card.geoWhitelist,
+          amount,
+          mcc,
+        });
+        throw new BadRequestException(
+          `Geolocation ${geoLocation} is not allowed for this card. Allowed locations: ${card.geoWhitelist.join(', ')}`,
+        );
+      }
+    }
+
+    if (card.spendLimits && Object.keys(card.spendLimits).length > 0) {
+      if (card.spendLimits.daily) {
+        const dailyLimit = parseFloat(String(card.spendLimits.daily));
+        if (amount > dailyLimit) {
+          await this.auditService.record('system', 'CARD_TRANSACTION_REJECTED', {
+            cardToken,
+            reason: 'DAILY_LIMIT_EXCEEDED',
+            amount,
+            dailyLimit,
+            mcc,
+            geoLocation,
+          });
+          throw new BadRequestException(
+            `Transaction amount ${amount} exceeds card daily limit ${dailyLimit}`,
+          );
+        }
+      }
+
+      if (card.spendLimits.monthly) {
+        const monthlyLimit = parseFloat(String(card.spendLimits.monthly));
+        if (amount > monthlyLimit) {
+          await this.auditService.record('system', 'CARD_TRANSACTION_REJECTED', {
+            cardToken,
+            reason: 'MONTHLY_LIMIT_EXCEEDED',
+            amount,
+            monthlyLimit,
+            mcc,
+            geoLocation,
+          });
+          throw new BadRequestException(
+            `Transaction amount ${amount} exceeds card monthly limit ${monthlyLimit}`,
+          );
+        }
+      }
+    }
+
+    await this.auditService.record('system', 'CARD_TRANSACTION_VALIDATED', {
+      cardToken,
+      amount,
+      mcc,
+      geoLocation,
+    });
+
+    return {
+      valid: true,
+      cardId: card.id,
+      accountId: card.accountId,
+    };
   }
 
   private async findByToken(cardToken: string) {
