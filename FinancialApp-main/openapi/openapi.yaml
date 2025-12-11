@@ -32,6 +32,28 @@ paths:
       responses:
         '200':
           description: Authenticated
+  /auth/me:
+    get:
+      summary: Get current user information
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user info
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenDto'
+      responses:
+        '200':
+          description: Tokens refreshed
   /accounts:
     get:
       summary: List accounts for current user
@@ -81,7 +103,21 @@ paths:
       responses:
         '200':
           description: Payment accepted
-  /ledger/{accountId}:
+  /ledger/transfer:
+    post:
+      summary: Create ledger transfer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLedgerEntryDto'
+      responses:
+        '201':
+          description: Transfer created
+  /ledger/account/{accountId}:
     get:
       summary: Get ledger entries for account
       security:
@@ -95,6 +131,109 @@ paths:
       responses:
         '200':
           description: Ledger entries
+  /ledger/entry/{entryId}:
+    get:
+      summary: Get ledger entry by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: entryId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Ledger entry
+  /ledger/account/{accountId}/balance/verify:
+    get:
+      summary: Verify account balance consistency
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Balance verification result
+  /notifications:
+    get:
+      summary: Get user notifications with pagination
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/NotificationType'
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Paginated notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotifications'
+  /notifications/unread/count:
+    get:
+      summary: Get count of unread notifications
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Unread count
+  /notifications/{id}:
+    get:
+      summary: Get notification by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notification found
+    patch:
+      summary: Mark notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notification marked as read
+  /notifications/read-all:
+    patch:
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
   /notifications/preferences:
     get:
       summary: Get notification preferences
@@ -130,14 +269,264 @@ paths:
       responses:
         '200':
           description: Frozen
+  /card-controls/register:
+    post:
+      summary: Register a new card
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCardDto'
+      responses:
+        '201':
+          description: Card registered
+  /card-controls/{cardToken}/freeze:
+    post:
+      summary: Freeze card
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cardToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FreezeCardDto'
+      responses:
+        '200':
+          description: Frozen
   /card-controls/{cardToken}/unfreeze:
     post:
       summary: Unfreeze card
       security:
         - bearerAuth: []
+      parameters:
+        - name: cardToken
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Unfrozen
+  /card-controls/{cardToken}/limits:
+    patch:
+      summary: Update card limits
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: cardToken
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCardLimitsDto'
+      responses:
+        '200':
+          description: Limits updated
+  /kyc/status:
+    get:
+      summary: Get KYC status and documents
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: KYC status and documents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KycStatusResponse'
+  /kyc/documents:
+    get:
+      summary: Get all KYC documents
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of KYC documents
+    post:
+      summary: Submit KYC document
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitKycDocumentDto'
+      responses:
+        '201':
+          description: Document submitted
+  /kyc/documents/{id}:
+    get:
+      summary: Get KYC document by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: KYC document found
+  /kyc/documents/{id}/status:
+    patch:
+      summary: Update KYC document status (admin)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKycDocumentStatusDto'
+      responses:
+        '200':
+          description: Document status updated
+  /kyc/submit:
+    post:
+      summary: Submit KYC information (legacy)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitKycDto'
+      responses:
+        '200':
+          description: KYC submitted
+  /kyc/status:
+    patch:
+      summary: Update KYC status (admin)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKycStatusDto'
+      responses:
+        '200':
+          description: KYC status updated
+  /limits:
+    get:
+      summary: Get all limit rules
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of limit rules
+    post:
+      summary: Create limit rule
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLimitDto'
+      responses:
+        '201':
+          description: Limit rule created
+  /audit:
+    get:
+      summary: Get audit logs with filtering
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: actor
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: traceId
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated audit logs
+  /audit/stats:
+    get:
+      summary: Get audit action statistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Action statistics
+  /audit/{id}:
+    get:
+      summary: Get audit log by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Audit log found
 components:
   securitySchemes:
     bearerAuth:
@@ -209,3 +598,283 @@ components:
         reason:
           type: string
       required: [reason]
+    RefreshTokenDto:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required: [refreshToken]
+    CreateLedgerEntryDto:
+      type: object
+      properties:
+        debitAccountId:
+          type: integer
+        creditAccountId:
+          type: integer
+        amount:
+          type: number
+          minimum: 0.01
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+        idempotencyKey:
+          type: string
+          format: uuid
+        traceId:
+          type: string
+      required: [debitAccountId, creditAccountId, amount, currency, idempotencyKey]
+    NotificationType:
+      type: string
+      enum: [TRANSACTION, PAYMENT, CARD_CONTROL, KYC, LIMIT, SYSTEM]
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          $ref: '#/components/schemas/NotificationType'
+        title:
+          type: string
+        message:
+          type: string
+        metadata:
+          type: object
+        status:
+          type: string
+          enum: [PENDING, SENT, DELIVERED, READ, FAILED]
+        channels:
+          type: array
+          items:
+            type: string
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    PaginatedNotifications:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+    RegisterCardDto:
+      type: object
+      properties:
+        accountId:
+          type: integer
+        cardToken:
+          type: string
+      required: [accountId, cardToken]
+    UpdateCardLimitsDto:
+      type: object
+      properties:
+        mccWhitelist:
+          type: array
+          items:
+            type: integer
+        geoWhitelist:
+          type: array
+          items:
+            type: string
+        spendLimits:
+          type: object
+    DocumentType:
+      type: string
+      enum: [PASSPORT, ID_CARD, DRIVER_LICENSE, UTILITY_BILL, BANK_STATEMENT, PROOF_OF_ADDRESS]
+    DocumentStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED, REVIEW]
+    KycStatus:
+      type: string
+      enum: [PENDING, VERIFIED, REJECTED, REVIEW]
+    SubmitKycDto:
+      type: object
+      properties:
+        documentType:
+          type: string
+        documentNumber:
+          type: string
+      required: [documentType, documentNumber]
+    SubmitKycDocumentDto:
+      type: object
+      properties:
+        documentType:
+          $ref: '#/components/schemas/DocumentType'
+        documentNumber:
+          type: string
+        fileUrl:
+          type: string
+        filePath:
+          type: string
+        expiryDate:
+          type: string
+          format: date
+        metadata:
+          type: object
+      required: [documentType]
+    KycDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        documentType:
+          $ref: '#/components/schemas/DocumentType'
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        documentNumber:
+          type: string
+          nullable: true
+        fileUrl:
+          type: string
+          nullable: true
+        filePath:
+          type: string
+          nullable: true
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+        rejectionReason:
+          type: string
+          nullable: true
+        reviewedBy:
+          type: string
+          nullable: true
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateKycDocumentStatusDto:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        rejectionReason:
+          type: string
+        reviewedBy:
+          type: string
+      required: [status]
+    UpdateKycStatusDto:
+      type: object
+      properties:
+        userId:
+          type: integer
+        status:
+          $ref: '#/components/schemas/KycStatus'
+      required: [userId, status]
+    KycStatusResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+        status:
+          $ref: '#/components/schemas/KycStatus'
+        documents:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              documentType:
+                $ref: '#/components/schemas/DocumentType'
+              status:
+                $ref: '#/components/schemas/DocumentStatus'
+              createdAt:
+                type: string
+                format: date-time
+              reviewedAt:
+                type: string
+                format: date-time
+                nullable: true
+              rejectionReason:
+                type: string
+                nullable: true
+        documentsCount:
+          type: integer
+        approvedCount:
+          type: integer
+        pendingCount:
+          type: integer
+        rejectedCount:
+          type: integer
+    CreateLimitDto:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [DAILY, MONTHLY, PER_TRANSACTION]
+        threshold:
+          type: number
+          minimum: 0
+        accountId:
+          type: integer
+          nullable: true
+        userId:
+          type: integer
+          nullable: true
+        mcc:
+          type: integer
+          nullable: true
+        geo:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+          default: true
+      required: [scope, threshold]
+    LimitRule:
+      type: object
+      properties:
+        id:
+          type: integer
+        accountId:
+          type: integer
+          nullable: true
+        userId:
+          type: integer
+          nullable: true
+        scope:
+          type: string
+          enum: [DAILY, MONTHLY, PER_TRANSACTION]
+        threshold:
+          type: string
+        mcc:
+          type: integer
+          nullable: true
+        geo:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
