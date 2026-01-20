@@ -71,6 +71,14 @@ export class AuthService {
     return this.usersRepository.findOne({ where: { id: userId } });
   }
 
+  async getUserById(userId: number) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
+  }
+
   private generateTokens(user: User) {
     const payload = { sub: user.id, roles: user.roles, email: user.email };
     const accessToken = this.jwtService.sign(payload);
