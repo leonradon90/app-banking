@@ -1,0 +1,1033 @@
+openapi: 3.0.0
+paths:
+  /health:
+    get:
+      operationId: AppController_getHealth
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: &a1
+        - health
+  /status:
+    get:
+      operationId: AppController_getStatus
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a1
+  /metrics:
+    get:
+      operationId: MetricsController_getMetrics
+      parameters: []
+      responses:
+        "200":
+          description: ""
+  /metrics/json:
+    get:
+      operationId: MetricsController_getMetricsJson
+      parameters: []
+      responses:
+        "200":
+          description: ""
+  /auth/register:
+    post:
+      operationId: AuthController_register
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDto"
+      responses:
+        "201":
+          description: ""
+      tags: &a2
+        - auth
+  /auth/login:
+    post:
+      operationId: AuthController_login
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginDto"
+      responses:
+        "201":
+          description: ""
+      tags: *a2
+  /auth/me:
+    get:
+      operationId: AuthController_me
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a2
+      security:
+        - bearer: []
+  /auth/refresh:
+    post:
+      operationId: AuthController_refresh
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenDto"
+      responses:
+        "201":
+          description: ""
+      tags: *a2
+  /auth/oauth/status:
+    get:
+      operationId: AuthController_oauthStatus
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a2
+  /auth/oauth/token:
+    post:
+      operationId: AuthController_oauthToken
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OAuthTokenDto"
+      responses:
+        "201":
+          description: ""
+      tags: *a2
+  /accounts:
+    post:
+      operationId: AccountsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountDto"
+      responses:
+        "201":
+          description: ""
+      tags: &a3
+        - accounts
+      security: &a4
+        - bearer: []
+    get:
+      operationId: AccountsController_findMine
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a3
+      security: *a4
+  /accounts/{id}:
+    get:
+      operationId: AccountsController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: ""
+      tags: *a3
+      security: *a4
+  /accounts/{id}/fund:
+    post:
+      operationId: AccountsController_fundAccount
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FundAccountDto"
+      responses:
+        "201":
+          description: ""
+      tags: *a3
+      security: *a4
+  /ledger/transfer:
+    post:
+      operationId: LedgerController_createTransfer
+      summary: Создать перевод через главную книгу
+      parameters:
+        - name: idempotency-key
+          required: true
+          in: header
+          schema:
+            type: string
+        - name: x-trace-id
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLedgerEntryDto"
+      responses:
+        "201":
+          description: Перевод успешно создан
+        "400":
+          description: Неверные параметры запроса
+        "409":
+          description: Конфликт версий (нужно повторить запрос)
+      tags: &a5
+        - ledger
+      security: &a6
+        - bearer: []
+  /ledger/account/{accountId}:
+    get:
+      operationId: LedgerController_findByAccount
+      summary: Получить историю транзакций для счета
+      parameters:
+        - name: accountId
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: История транзакций
+      tags: *a5
+      security: *a6
+  /ledger/{accountId}:
+    get:
+      operationId: LedgerController_findByAccountLegacy
+      summary: Получить историю транзакций для счета (legacy path)
+      parameters:
+        - name: accountId
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: История транзакций
+      tags: *a5
+      security: *a6
+  /ledger/entry/{entryId}:
+    get:
+      operationId: LedgerController_getEntry
+      summary: Получить запись по ID
+      parameters:
+        - name: entryId
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Запись найдена
+        "404":
+          description: Запись не найдена
+      tags: *a5
+      security: *a6
+  /ledger/account/{accountId}/balance/verify:
+    get:
+      operationId: LedgerController_verifyBalance
+      summary: Проверить целостность баланса счета
+      parameters:
+        - name: accountId
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Результат проверки баланса
+      tags: *a5
+      security: *a6
+  /ledger/account/{accountId}/reconcile:
+    post:
+      operationId: LedgerController_reconcileAccount
+      summary: Реконсиляция баланса счета с проводками
+      parameters:
+        - name: accountId
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Результат реконсиляции
+      tags: *a5
+      security: *a6
+  /audit:
+    get:
+      operationId: AuditController_getAuditLogs
+      summary: Получить логи аудита с фильтрацией и пагинацией
+      parameters:
+        - name: actor
+          required: false
+          in: query
+          description: Фильтр по актору
+          schema:
+            type: string
+        - name: action
+          required: false
+          in: query
+          description: Фильтр по действию
+          schema:
+            type: string
+        - name: traceId
+          required: false
+          in: query
+          description: Фильтр по trace_id
+          schema:
+            type: string
+        - name: startDate
+          required: false
+          in: query
+          description: Дата начала (ISO 8601)
+          schema:
+            type: string
+        - name: endDate
+          required: false
+          in: query
+          description: Дата окончания (ISO 8601)
+          schema:
+            type: string
+        - name: page
+          required: false
+          in: query
+          description: Номер страницы
+          schema:
+            minimum: 1
+            default: 1
+            type: number
+        - name: limit
+          required: false
+          in: query
+          description: Размер страницы
+          schema:
+            minimum: 1
+            maximum: 100
+            default: 20
+            type: number
+      responses:
+        "200":
+          description: Список логов аудита
+      tags: &a7
+        - audit
+      security: &a8
+        - bearer: []
+  /audit/actor/{actor}:
+    get:
+      operationId: AuditController_getLogsByActor
+      summary: Получить логи аудита по актору
+      parameters:
+        - name: actor
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: page
+          required: true
+          in: query
+          schema:
+            type: number
+        - name: limit
+          required: true
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Логи аудита для указанного актора
+      tags: *a7
+      security: *a8
+  /audit/action/{action}:
+    get:
+      operationId: AuditController_getLogsByAction
+      summary: Получить логи аудита по действию
+      parameters:
+        - name: action
+          required: true
+          in: path
+          schema:
+            type: string
+        - name: page
+          required: true
+          in: query
+          schema:
+            type: number
+        - name: limit
+          required: true
+          in: query
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Логи аудита для указанного действия
+      tags: *a7
+      security: *a8
+  /audit/trace/{traceId}:
+    get:
+      operationId: AuditController_getLogsByTraceId
+      summary: Получить логи аудита по trace_id
+      parameters:
+        - name: traceId
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Логи аудита для указанного trace_id
+      tags: *a7
+      security: *a8
+  /audit/stats:
+    get:
+      operationId: AuditController_getStats
+      summary: Получить статистику по действиям
+      parameters:
+        - name: startDate
+          required: false
+          in: query
+          schema:
+            type: string
+        - name: endDate
+          required: false
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Статистика по действиям
+      tags: *a7
+      security: *a8
+  /audit/{id}:
+    get:
+      operationId: AuditController_getLogById
+      summary: Получить лог аудита по ID
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Лог аудита найден
+        "404":
+          description: Лог аудита не найден
+      tags: *a7
+      security: *a8
+  /payments:
+    post:
+      operationId: PaymentsController_create
+      parameters:
+        - name: idempotency-key
+          required: true
+          in: header
+          schema:
+            type: string
+        - name: x-trace-id
+          required: true
+          in: header
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePaymentDto"
+      responses:
+        "201":
+          description: ""
+      tags: &a9
+        - payments
+      security: &a10
+        - bearer: []
+  /payments/schedules:
+    get:
+      operationId: PaymentsController_listSchedules
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a9
+      security: *a10
+  /payments/schedules/{id}/cancel:
+    post:
+      operationId: PaymentsController_cancelSchedule
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "201":
+          description: ""
+      tags: *a9
+      security: *a10
+  /limits:
+    post:
+      operationId: LimitsController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLimitDto"
+      responses:
+        "201":
+          description: ""
+      tags: &a11
+        - limits
+      security: &a12
+        - bearer: []
+    get:
+      operationId: LimitsController_findAll
+      parameters: []
+      responses:
+        "200":
+          description: ""
+      tags: *a11
+      security: *a12
+  /card-controls/register:
+    post:
+      operationId: CardControlsController_register
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterCardDto"
+      responses:
+        "201":
+          description: ""
+      tags: &a13
+        - card-controls
+      security: &a14
+        - bearer: []
+  /card-controls/tokenize:
+    post:
+      operationId: CardControlsController_tokenize
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenizeCardDto"
+      responses:
+        "201":
+          description: ""
+      tags: *a13
+      security: *a14
+  /card-controls/{cardToken}/freeze:
+    post:
+      operationId: CardControlsController_freeze
+      parameters:
+        - name: cardToken
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FreezeDto"
+      responses:
+        "201":
+          description: ""
+      tags: *a13
+      security: *a14
+  /card-controls/{cardToken}/unfreeze:
+    post:
+      operationId: CardControlsController_unfreeze
+      parameters:
+        - name: cardToken
+          required: true
+          in: path
+          schema:
+            type: string
+      responses:
+        "201":
+          description: ""
+      tags: *a13
+      security: *a14
+  /card-controls/{cardToken}/limits:
+    patch:
+      operationId: CardControlsController_updateLimits
+      parameters:
+        - name: cardToken
+          required: true
+          in: path
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLimitsDto"
+      responses:
+        "200":
+          description: ""
+      tags: *a13
+      security: *a14
+  /notifications:
+    get:
+      operationId: NotificationsController_getNotifications
+      summary: Get user notifications with pagination
+      parameters:
+        - name: page
+          required: false
+          in: query
+          schema:
+            type: number
+        - name: limit
+          required: false
+          in: query
+          schema:
+            type: number
+        - name: type
+          required: false
+          in: query
+          schema:
+            enum:
+              - TRANSACTION
+              - PAYMENT
+              - CARD_CONTROL
+              - KYC
+              - LIMIT
+              - SYSTEM
+            type: string
+        - name: unreadOnly
+          required: false
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of notifications
+      tags: &a15
+        - notifications
+      security: &a16
+        - bearer: []
+  /notifications/unread/count:
+    get:
+      operationId: NotificationsController_getUnreadCount
+      summary: Get count of unread notifications
+      parameters: []
+      responses:
+        "200":
+          description: Count of unread notifications
+      tags: *a15
+      security: *a16
+  /notifications/devices:
+    post:
+      operationId: NotificationsController_registerDevice
+      summary: Register a push notification device token
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterDeviceDto"
+      responses:
+        "201":
+          description: Device registered
+      tags: *a15
+      security: *a16
+  /notifications/{id}:
+    get:
+      operationId: NotificationsController_getNotification
+      summary: Get notification by ID
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Notification found
+        "404":
+          description: Notification not found
+      tags: *a15
+      security: *a16
+  /notifications/{id}/read:
+    patch:
+      operationId: NotificationsController_markAsRead
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Notification marked as read
+        "404":
+          description: Notification not found
+      tags: *a15
+      security: *a16
+  /notifications/read-all:
+    patch:
+      operationId: NotificationsController_markAllAsRead
+      summary: Mark all notifications as read
+      parameters: []
+      responses:
+        "200":
+          description: All notifications marked as read
+      tags: *a15
+      security: *a16
+  /notifications/preferences:
+    post:
+      operationId: NotificationsController_update
+      summary: Update notification preferences
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationsDto"
+      responses:
+        "200":
+          description: Preferences updated
+      tags: *a15
+      security: *a16
+    get:
+      operationId: NotificationsController_get
+      summary: Get notification preferences
+      parameters: []
+      responses:
+        "200":
+          description: User notification preferences
+      tags: *a15
+      security: *a16
+  /kyc/status:
+    get:
+      operationId: KycController_getStatus
+      summary: Get KYC status and documents for current user
+      parameters: []
+      responses:
+        "200":
+          description: KYC status and documents
+      tags: &a17
+        - kyc
+      security: &a18
+        - bearer: []
+    patch:
+      operationId: KycController_updateStatus
+      summary: Update KYC status (admin only)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateKycStatusDto"
+      responses:
+        "200":
+          description: KYC status updated
+      tags: *a17
+      security: *a18
+  /kyc/documents:
+    get:
+      operationId: KycController_getDocuments
+      summary: Get all KYC documents for current user
+      parameters: []
+      responses:
+        "200":
+          description: List of KYC documents
+      tags: *a17
+      security: *a18
+    post:
+      operationId: KycController_submitDocument
+      summary: Submit KYC document
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitKycDocumentDto"
+      responses:
+        "201":
+          description: Document submitted
+      tags: *a17
+      security: *a18
+  /kyc/documents/{id}:
+    get:
+      operationId: KycController_getDocument
+      summary: Get KYC document by ID
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      responses:
+        "200":
+          description: KYC document found
+        "404":
+          description: KYC document not found
+      tags: *a17
+      security: *a18
+  /kyc/integrations/status:
+    get:
+      operationId: KycController_getIntegrationsStatus
+      summary: Get KYC integration status (provider/storage)
+      parameters: []
+      responses:
+        "200":
+          description: KYC integration status
+      tags: *a17
+      security: *a18
+  /kyc/submit:
+    post:
+      operationId: KycController_submit
+      summary: Submit KYC information (legacy)
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitKycDto"
+      responses:
+        "200":
+          description: KYC submitted
+      tags: *a17
+      security: *a18
+  /kyc/documents/{id}/status:
+    patch:
+      operationId: KycController_updateDocumentStatus
+      summary: Update KYC document status (admin only)
+      parameters:
+        - name: id
+          required: true
+          in: path
+          schema:
+            type: number
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateKycDocumentStatusDto"
+      responses:
+        "200":
+          description: Document status updated
+        "404":
+          description: Document not found
+      tags: *a17
+      security: *a18
+info:
+  title: Digital Banking Core API
+  description: API surface for the digital banking MVP core components.
+  version: 1.0.0
+  contact: {}
+tags: []
+servers: []
+components:
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+  schemas:
+    RegisterDto:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+    LoginDto:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+    RefreshTokenDto:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+      required:
+        - refreshToken
+    OAuthTokenDto:
+      type: object
+      properties: {}
+    CreateAccountDto:
+      type: object
+      properties:
+        currency:
+          type: string
+          default: USD
+          description: ISO currency code
+        initialBalance:
+          type: number
+          default: 0
+      required:
+        - currency
+    FundAccountDto:
+      type: object
+      properties: {}
+    CreateLedgerEntryDto:
+      type: object
+      properties:
+        debitAccountId:
+          type: number
+        creditAccountId:
+          type: number
+        amount:
+          type: number
+        currency:
+          type: string
+          default: USD
+        idempotencyKey:
+          type: string
+          description: Idempotency key per client request
+        traceId:
+          type: string
+      required:
+        - debitAccountId
+        - creditAccountId
+        - amount
+        - currency
+        - idempotencyKey
+    CreatePaymentDto:
+      type: object
+      properties:
+        fromAccount:
+          type: number
+        toAccount:
+          type: number
+        amount:
+          type: number
+        currency:
+          type: string
+          default: USD
+        idempotencyKey:
+          type: string
+        traceId:
+          type: string
+        transferType:
+          type: string
+          enum:
+            - INTERNAL
+            - INTERBANK
+          default: INTERNAL
+        beneficiaryIban:
+          type: string
+          description: Beneficiary IBAN for interbank transfers
+        beneficiaryBank:
+          type: string
+          description: Beneficiary bank name
+        scheduledFor:
+          type: string
+          description: Schedule payment for a future ISO date
+        description:
+          type: string
+        cardToken:
+          type: string
+          description: Card token for card transactions
+        mcc:
+          type: number
+          description: MCC (Merchant Category Code) for card transactions
+        geoLocation:
+          type: string
+          description: Geolocation code (ISO country code) for card transactions
+          example: US
+      required:
+        - fromAccount
+        - toAccount
+        - amount
+        - currency
+        - idempotencyKey
+    CreateLimitDto:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum:
+            - DAILY
+            - MONTHLY
+            - PER_TRANSACTION
+        threshold:
+          type: number
+        accountId:
+          type: number
+        userId:
+          type: number
+        active:
+          type: boolean
+          default: true
+      required:
+        - scope
+        - threshold
+        - active
+    RegisterCardDto:
+      type: object
+      properties: {}
+    TokenizeCardDto:
+      type: object
+      properties: {}
+    FreezeDto:
+      type: object
+      properties: {}
+    UpdateLimitsDto:
+      type: object
+      properties: {}
+    RegisterDeviceDto:
+      type: object
+      properties: {}
+    UpdateNotificationsDto:
+      type: object
+      properties: {}
+    SubmitKycDto:
+      type: object
+      properties: {}
+    SubmitKycDocumentDto:
+      type: object
+      properties: {}
+    UpdateKycDocumentStatusDto:
+      type: object
+      properties: {}
+    UpdateKycStatusDto:
+      type: object
+      properties: {}
