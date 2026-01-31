@@ -8,3 +8,4 @@ coverage
 /frontend/.next
 /frontend/.env
 /frontend/.env.local
+/storage
