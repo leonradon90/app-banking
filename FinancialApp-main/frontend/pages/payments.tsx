@@ -185,32 +185,28 @@ Scheduled for: ${scheduleLabel}`;
       setMessage(response.message);
 
       if (response.status === 'scheduled') {
+        const scheduledEvent: ActivityEvent = {
+          id: String(response.scheduleId ?? Date.now()),
+          title: `Transfer scheduled ${currency} ${Number(amount).toFixed(2)}`,
+          description: `From ${fromAccount} to ${toAccount}`,
+          status: 'pending',
+          occurredAt: new Date().toISOString(),
+        };
         setEvents((prev) =>
-          [
-            {
-              id: String(response.scheduleId ?? Date.now()),
-              title: `Transfer scheduled ${currency} ${Number(amount).toFixed(2)}`,
-              description: `From ${fromAccount} to ${toAccount}`,
-              status: 'pending',
-              occurredAt: new Date().toISOString(),
-            },
-            ...prev,
-          ].slice(0, 8)
+          [scheduledEvent, ...prev].slice(0, 8)
         );
         await loadSchedules();
       } else {
         const txId = response.transactionId ?? response.transaction_id ?? Date.now();
+        const transferEvent: ActivityEvent = {
+          id: String(txId),
+          title: `${response.status === 'pending' ? 'Interbank transfer' : 'Transfer'} ${currency} ${Number(amount).toFixed(2)}`,
+          description: `From ${fromAccount} to ${toAccount}`,
+          status: response.status === 'pending' ? 'pending' : 'success',
+          occurredAt: new Date().toISOString(),
+        };
         setEvents((prev) =>
-          [
-            {
-              id: String(txId),
-              title: `${response.status === 'pending' ? 'Interbank transfer' : 'Transfer'} ${currency} ${Number(amount).toFixed(2)}`,
-              description: `From ${fromAccount} to ${toAccount}`,
-              status: response.status === 'pending' ? 'pending' : 'success',
-              occurredAt: new Date().toISOString(),
-            },
-            ...prev,
-          ].slice(0, 8)
+          [transferEvent, ...prev].slice(0, 8)
         );
       }
       setAmount('');
