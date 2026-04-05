@@ -1,0 +1,97 @@
+services:
+  - type: web
+    name: financial-app-api
+    runtime: node
+    plan: free
+    rootDir: .
+    buildCommand: npm install && npm run build
+    startCommand: npm run migration:run && npm run start
+    envVars:
+      - key: APP_PORT
+        value: 3000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: financial-app-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: financial-app-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: financial-app-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: financial-app-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: financial-app-db
+          property: database
+      - key: REDIS_HOST
+        value: localhost
+      - key: REDIS_PORT
+        value: 6379
+      - key: KAFKA_ENABLED
+        value: false
+      - key: NOTIFICATIONS_MODE
+        value: stub
+      - key: WEBSOCKET_ENABLED
+        value: true
+      - key: WEBSOCKET_CORS_ORIGIN
+        value: '*'
+      - key: NOTIFICATIONS_KAFKA_CONSUMER_ENABLED
+        value: false
+      - key: OAUTH_MODE
+        value: stub
+      - key: KYC_PROVIDER_MODE
+        value: stub
+      - key: KYC_PROVIDER_NAME
+        value: stub
+      - key: KYC_STORAGE_MODE
+        value: stub
+      - key: KYC_STORAGE_PATH
+        value: storage/kyc
+      - key: KYC_STORAGE_BASE_URL
+        value: stub://kyc
+      - key: INTERBANK_MODE
+        value: stub
+      - key: INTERBANK_PROVIDER
+        value: stub
+      - key: SCHEDULER_ENABLED
+        value: false
+      - key: AUDIT_WORM_MODE
+        value: stub
+      - key: AUDIT_WORM_PATH
+        value: storage/audit_worm.log
+      - key: CARD_VAULT_MODE
+        value: stub
+      - key: CARD_TOKENIZATION_SECRET
+        value: stub-token
+      - key: METRICS_ENABLED
+        value: true
+      - key: TRACING_ENABLED
+        value: true
+      - key: HTTPS_ENABLED
+        value: false
+      - key: LEDGER_EVENT_SIGNING_ENABLED
+        value: false
+      - key: POSTGRES_REPLICA_ENABLED
+        value: false
+      - key: REDIS_SENTINEL_ENABLED
+        value: false
+
+databases:
+  - name: financial-app-db
+    databaseName: financial_app
+    user: financial_app
+    plan: free
