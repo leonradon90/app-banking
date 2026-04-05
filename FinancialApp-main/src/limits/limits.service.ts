@@ -1,11 +1,15 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { LimitRule, LimitScope } from './entities/limit-rule.entity';
-import { CreatePaymentDto } from '../payments/dto/create-payment.dto';
+
+import { Account } from '../accounts/entities/account.entity';
 import { AuditService } from '../audit/audit.service';
-import { LedgerEntry } from '../ledger/entities/ledger-entry.entity';
+import { hasPrivilegedRole } from '../common/utils/roles';
 import { EventsService } from '../events/events.service';
+import { LedgerEntry } from '../ledger/entities/ledger-entry.entity';
+import { CreatePaymentDto } from '../payments/dto/create-payment.dto';
+
+import { LimitRule, LimitScope } from './entities/limit-rule.entity';
 
 @Injectable()
 export class LimitsService {
@@ -37,7 +41,7 @@ export class LimitsService {
       if (!rule.active) continue;
 
       let currentSpent = 0;
-      let threshold = parseFloat(rule.threshold);
+      const threshold = parseFloat(rule.threshold);
       let wouldExceed = false;
 
       if (rule.scope === LimitScope.PER_TRANSACTION) {
@@ -167,13 +171,65 @@ export class LimitsService {
     });
   }
 
-  async createRule(rule: Partial<LimitRule>) {
-    const entity = this.limitsRepository.create(rule);
-    return this.limitsRepository.save(entity);
+  async createRule(rule: Partial<LimitRule>, userId: number, actor: string, roles?: string[]) {
+    const privileged = hasPrivilegedRole(roles);
+    const targetUserId = privileged ? rule.userId : userId;
+    const targetAccountId = rule.accountId
+      ? await this.resolveAccountScope(rule.accountId, userId, roles)
+      : undefined;
+
+    if (!privileged && rule.userId !== undefined && rule.userId !== userId) {
+      throw new ForbiddenException('You can only manage limits for your own profile');
+    }
+
+    const entity = this.limitsRepository.create({
+      ...rule,
+      userId: targetUserId,
+      accountId: targetAccountId,
+    });
+    const saved = await this.limitsRepository.save(entity);
+    await this.auditService.record(actor, 'LIMIT_RULE_CREATED', {
+      ruleId: saved.id,
+      scope: saved.scope,
+      threshold: saved.threshold,
+      userId: saved.userId,
+      accountId: saved.accountId,
+    });
+    return saved;
   }
 
-  async getRules() {
-    return this.limitsRepository.find();
+  async getRules(userId: number, roles?: string[]) {
+    if (hasPrivilegedRole(roles)) {
+      return this.limitsRepository.find();
+    }
+
+    const accountRepo = this.dataSource.getRepository(Account);
+    const accounts = await accountRepo.find({
+      where: { userId },
+      select: ['id'],
+    });
+    const accountIds = accounts.map((account) => account.id);
+
+    const queryBuilder = this.limitsRepository.createQueryBuilder('rule');
+    queryBuilder.where('rule.user_id = :userId', { userId });
+    if (accountIds.length > 0) {
+      queryBuilder.orWhere('rule.account_id IN (:...accountIds)', { accountIds });
+    }
+    queryBuilder.orWhere('(rule.account_id IS NULL AND rule.user_id IS NULL)');
+    queryBuilder.orderBy('rule.created_at', 'DESC');
+    return queryBuilder.getMany();
+  }
+
+  private async resolveAccountScope(accountId: number, userId: number, roles?: string[]) {
+    const accountRepo = this.dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new BadRequestException('Account not found');
+    }
+    if (account.userId !== userId && !hasPrivilegedRole(roles)) {
+      throw new ForbiddenException('You can only manage limits for your own accounts');
+    }
+    return account.id;
   }
 
   private extractUserId(actor: string): number | undefined {

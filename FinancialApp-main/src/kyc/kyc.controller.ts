@@ -1,35 +1,15 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
-import { KycService } from './kyc.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { IsEnum, IsNumber, IsString, IsOptional, IsDateString, IsObject } from 'class-validator';
+
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
-import { KycStatus } from './kyc-status.enum';
-import { DocumentType, DocumentStatus } from './entities/kyc-document.entity';
 import { Roles } from '../common/decorators/roles.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
-import {
-  IsEnum,
-  IsNumber,
-  IsString,
-  IsOptional,
-  IsDateString,
-  IsObject,
-} from 'class-validator';
+
+import { DocumentType, DocumentStatus } from './entities/kyc-document.entity';
+import { KycStatus } from './kyc-status.enum';
+import { KycService } from './kyc.service';
 
 class SubmitKycDto {
   @IsString()
@@ -119,10 +99,7 @@ export class KycController {
   @ApiParam({ name: 'id', type: 'number' })
   @ApiResponse({ status: 200, description: 'KYC document found' })
   @ApiResponse({ status: 404, description: 'KYC document not found' })
-  getDocument(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  getDocument(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserPayload) {
     return this.kycService.getDocumentById(id, user.userId);
   }
 
@@ -170,10 +147,7 @@ export class KycController {
   @ApiResponse({ status: 200, description: 'KYC status updated' })
   @Roles('admin', 'compliance')
   @UseGuards(RolesGuard)
-  updateStatus(
-    @Body() dto: UpdateKycStatusDto,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  updateStatus(@Body() dto: UpdateKycStatusDto, @CurrentUser() user: CurrentUserPayload) {
     return this.kycService.updateStatus(dto.userId, dto.status, `user_${user.userId}`);
   }
 }

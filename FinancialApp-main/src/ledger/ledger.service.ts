@@ -1,23 +1,28 @@
+import { randomUUID } from 'crypto';
+
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
 import { Repository, DataSource } from 'typeorm';
-import { LedgerEntry } from './entities/ledger-entry.entity';
-import { CreateLedgerEntryDto } from './dto/create-ledger-entry.dto';
+
 import { Account, AccountStatus } from '../accounts/entities/account.entity';
 import { AuditService } from '../audit/audit.service';
-import { EventsService } from '../events/events.service';
-import { IdempotencyService } from './idempotency.service';
 import { User } from '../auth/entities/user.entity';
-import { KycStatus } from '../kyc/kyc-status.enum';
-import { randomUUID } from 'crypto';
-import * as bcrypt from 'bcrypt';
-import { ConfigService } from '@nestjs/config';
 import { signPayload } from '../common/utils/hmac';
+import { hasPrivilegedRole } from '../common/utils/roles';
+import { EventsService } from '../events/events.service';
+import { KycStatus } from '../kyc/kyc-status.enum';
+
+import { CreateLedgerEntryDto } from './dto/create-ledger-entry.dto';
+import { LedgerEntry } from './entities/ledger-entry.entity';
+import { IdempotencyService } from './idempotency.service';
 
 @Injectable()
 export class LedgerService {
@@ -60,9 +65,7 @@ export class LedgerService {
       }
 
       if (debitAccount.status !== AccountStatus.ACTIVE) {
-        throw new BadRequestException(
-          `Debit account ${dto.debitAccountId} is not active`,
-        );
+        throw new BadRequestException(`Debit account ${dto.debitAccountId} is not active`);
       }
 
       const creditAccount = await accountRepo.findOne({
@@ -73,9 +76,7 @@ export class LedgerService {
       }
 
       if (creditAccount.status !== AccountStatus.ACTIVE) {
-        throw new BadRequestException(
-          `Credit account ${dto.creditAccountId} is not active`,
-        );
+        throw new BadRequestException(`Credit account ${dto.creditAccountId} is not active`);
       }
 
       if (debitAccount.currency !== creditAccount.currency) {
@@ -115,9 +116,7 @@ export class LedgerService {
       );
 
       if (debitUpdateResult.affected === 0) {
-        throw new ConflictException(
-          'Debit account was modified concurrently. Please retry.',
-        );
+        throw new ConflictException('Debit account was modified concurrently. Please retry.');
       }
 
       const creditUpdateResult = await accountRepo.update(
@@ -132,9 +131,7 @@ export class LedgerService {
       );
 
       if (creditUpdateResult.affected === 0) {
-        throw new ConflictException(
-          'Credit account was modified concurrently. Please retry.',
-        );
+        throw new ConflictException('Credit account was modified concurrently. Please retry.');
       }
 
       const entry = manager.create(LedgerEntry, {
@@ -186,12 +183,25 @@ export class LedgerService {
       relations: ['debitAccount', 'creditAccount'],
     });
   }
+
+  async getHistoryForUser(accountId: number, userId: number, roles?: string[]) {
+    await this.assertAccountAccess(accountId, userId, roles);
+    return this.getHistory(accountId);
+  }
   async getCalculatedBalance(accountId: number): Promise<number> {
     const result = await this.ledgerRepository
       .createQueryBuilder('entry')
-      .select('SUM(CASE WHEN entry.creditAccountId = :accountId THEN entry.amount ELSE 0 END)', 'credits')
-      .addSelect('SUM(CASE WHEN entry.debitAccountId = :accountId THEN entry.amount ELSE 0 END)', 'debits')
-      .where('entry.debitAccountId = :accountId OR entry.creditAccountId = :accountId', { accountId })
+      .select(
+        'SUM(CASE WHEN entry.creditAccountId = :accountId THEN entry.amount ELSE 0 END)',
+        'credits',
+      )
+      .addSelect(
+        'SUM(CASE WHEN entry.debitAccountId = :accountId THEN entry.amount ELSE 0 END)',
+        'debits',
+      )
+      .where('entry.debitAccountId = :accountId OR entry.creditAccountId = :accountId', {
+        accountId,
+      })
       .getRawOne();
 
     const credits = parseFloat(result?.credits || '0');
@@ -211,7 +221,22 @@ export class LedgerService {
 
     return entry;
   }
-  
+
+  async getEntryByIdForUser(entryId: number, userId: number, roles?: string[]) {
+    const entry = await this.getEntryById(entryId);
+    if (hasPrivilegedRole(roles)) {
+      return entry;
+    }
+
+    const debitAccess = await this.canAccessAccount(entry.debitAccountId, userId, roles);
+    const creditAccess = await this.canAccessAccount(entry.creditAccountId, userId, roles);
+    if (!debitAccess && !creditAccess) {
+      throw new ForbiddenException('You do not have access to this ledger entry');
+    }
+
+    return entry;
+  }
+
   async verifyAccountBalance(accountId: number): Promise<{
     accountBalance: number;
     calculatedBalance: number;
@@ -232,6 +257,11 @@ export class LedgerService {
       calculatedBalance,
       isConsistent: Math.abs(accountBalance - calculatedBalance) < 0.01,
     };
+  }
+
+  async verifyAccountBalanceForUser(accountId: number, userId: number, roles?: string[]) {
+    await this.assertAccountAccess(accountId, userId, roles);
+    return this.verifyAccountBalance(accountId);
   }
 
   async reconcileAccountBalance(accountId: number, actor: string) {
@@ -255,7 +285,9 @@ export class LedgerService {
           'SUM(CASE WHEN entry.debitAccountId = :accountId THEN entry.amount ELSE 0 END)',
           'debits',
         )
-        .where('entry.debitAccountId = :accountId OR entry.creditAccountId = :accountId', { accountId })
+        .where('entry.debitAccountId = :accountId OR entry.creditAccountId = :accountId', {
+          accountId,
+        })
         .getRawOne();
 
       const credits = parseFloat(calculatedBalance?.credits || '0');
@@ -374,12 +406,48 @@ export class LedgerService {
     });
   }
 
+  async reconcileAccountBalanceForUser(
+    accountId: number,
+    actor: string,
+    userId: number,
+    roles?: string[],
+  ) {
+    if (!hasPrivilegedRole(roles)) {
+      throw new ForbiddenException('Ledger reconciliation is restricted to privileged operators');
+    }
+    await this.assertAccountAccess(accountId, userId, roles);
+    return this.reconcileAccountBalance(accountId, actor);
+  }
+
   private attachLedgerSignature(payload: Record<string, unknown>) {
-    const enabled =
-      this.configService.get<boolean>('ledger.eventSigningEnabled') ?? false;
+    const enabled = this.configService.get<boolean>('ledger.eventSigningEnabled') ?? false;
     const secret = this.configService.get<string>('ledger.eventSigningSecret') ?? '';
     if (!enabled || !secret) return;
     payload.signatureAlg = 'sha256';
     payload.signature = signPayload(payload, secret);
+  }
+
+  private async assertAccountAccess(accountId: number, userId: number, roles?: string[]) {
+    const accountRepo = this.dataSource.getRepository(Account);
+    const account = await accountRepo.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new NotFoundException(`Account ${accountId} not found`);
+    }
+    if (account.userId !== userId && !hasPrivilegedRole(roles)) {
+      throw new ForbiddenException('You do not have access to this account');
+    }
+    return account;
+  }
+
+  private async canAccessAccount(accountId: number, userId: number, roles?: string[]) {
+    try {
+      await this.assertAccountAccess(accountId, userId, roles);
+      return true;
+    } catch (error) {
+      if (error instanceof ForbiddenException || error instanceof NotFoundException) {
+        return false;
+      }
+      throw error;
+    }
   }
 }

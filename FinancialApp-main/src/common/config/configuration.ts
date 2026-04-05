@@ -103,8 +103,6 @@ export default () => ({
   ha: {
     postgresReplicaEnabled: process.env.POSTGRES_REPLICA_ENABLED === 'true',
     redisSentinelEnabled: process.env.REDIS_SENTINEL_ENABLED === 'true',
-    kafkaClusterBrokers: (process.env.KAFKA_CLUSTER_BROKERS ?? '')
-      .split(',')
-      .filter(Boolean),
+    kafkaClusterBrokers: (process.env.KAFKA_CLUSTER_BROKERS ?? '').split(',').filter(Boolean),
   },
 });

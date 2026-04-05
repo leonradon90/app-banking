@@ -36,9 +36,7 @@ export class MetricsService {
     lines.push('# TYPE http_requests_total counter');
     for (const [key, count] of this.requestCounts.entries()) {
       const [method, status] = key.split(':');
-      lines.push(
-        `http_requests_total{method="${method}",status="${status}"} ${count}`,
-      );
+      lines.push(`http_requests_total{method="${method}",status="${status}"} ${count}`);
     }
     lines.push('# HELP http_request_duration_ms Total request duration in ms');
     lines.push('# TYPE http_request_duration_ms summary');

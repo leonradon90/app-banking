@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import {
-  IdempotencyKey,
-  IdempotencyStatus,
-} from './entities/idempotency-key.entity';
+
+import { IdempotencyKey, IdempotencyStatus } from './entities/idempotency-key.entity';
 
 export type IdempotencyLookup = {
   idempotencyKey: string;

@@ -34,7 +34,6 @@ const formatAction = (value: string) =>
     .join(' ');
 
 export default function Audit() {
-  const [actor, setActor] = useState('');
   const [action, setAction] = useState('');
   const [traceId, setTraceId] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -45,10 +44,6 @@ export default function Audit() {
 
   const buildQuery = () => {
     const params = new URLSearchParams();
-    if (actor) {
-      const normalizedActor = /^\d+$/.test(actor.trim()) ? `user_${actor.trim()}` : actor.trim();
-      params.set('actor', normalizedActor);
-    }
     if (action) params.set('action', action);
     if (traceId) params.set('traceId', traceId);
     if (startDate) params.set('startDate', new Date(startDate).toISOString());
@@ -92,15 +87,6 @@ export default function Audit() {
         <section className="rounded-3xl border border-[var(--border)] bg-white/90 p-6">
           <h3 className="section-title">Search activity</h3>
           <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSearch}>
-            <div>
-              <label className="text-xs uppercase tracking-wide text-[var(--muted)]">User</label>
-              <input
-                value={actor}
-                onChange={(event) => setActor(event.target.value)}
-                className="input-field mt-2"
-                placeholder="user_1 or 1"
-              />
-            </div>
             <div>
               <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Action</label>
               <input

@@ -1,13 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AuthService } from '../auth/auth.service';
+import { FindOptionsWhere, Repository } from 'typeorm';
+
 import { AuditService } from '../audit/audit.service';
-import { KycStatus } from './kyc-status.enum';
-import { KycDocument, DocumentType, DocumentStatus } from './entities/kyc-document.entity';
-import { NotificationsService } from '../notifications/notifications.service';
+import { AuthService } from '../auth/auth.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+
+import { KycDocument, DocumentType, DocumentStatus } from './entities/kyc-document.entity';
 import { KycProviderService } from './kyc-provider.service';
+import { KycStatus } from './kyc-status.enum';
 import { KycStorageService } from './kyc-storage.service';
 
 export interface SubmitKycDocumentDto {
@@ -119,7 +121,7 @@ export class KycService {
   }
 
   async getDocumentById(id: number, userId?: number): Promise<KycDocument> {
-    const where: any = { id };
+    const where: FindOptionsWhere<KycDocument> = { id };
     if (userId) {
       where.userId = userId;
     }
@@ -183,13 +185,12 @@ export class KycService {
 
     const hasAllRequired = requiredDocuments.every((requiredType) => {
       return documents.some(
-        (doc) =>
-          doc.documentType === requiredType && doc.status === DocumentStatus.APPROVED,
+        (doc) => doc.documentType === requiredType && doc.status === DocumentStatus.APPROVED,
       );
     });
 
     if (hasAllRequired) {
-      const user = await this.authService.updateKycStatus(userId, KycStatus.VERIFIED);
+      await this.authService.updateKycStatus(userId, KycStatus.VERIFIED);
       await this.auditService.record('system', 'KYC_VERIFIED', { userId });
 
       try {
@@ -208,9 +209,9 @@ export class KycService {
 
   async getStatus(userId: number) {
     const documents = await this.getDocuments(userId);
-    
+
     const user = await this.authService.getUserById(userId);
-    
+
     return {
       userId,
       status: user.kycStatus,

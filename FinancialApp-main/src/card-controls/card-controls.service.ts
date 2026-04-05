@@ -1,46 +1,84 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { CardControl, CardStatus } from './entities/card-control.entity';
-import { EventsService } from '../events/events.service';
+
+import { Account } from '../accounts/entities/account.entity';
 import { AuditService } from '../audit/audit.service';
+import { hasPrivilegedRole } from '../common/utils/roles';
+import { EventsService } from '../events/events.service';
+
+import { CardControl, CardStatus } from './entities/card-control.entity';
 
 @Injectable()
 export class CardControlsService {
   constructor(
     @InjectRepository(CardControl)
     private readonly cardRepository: Repository<CardControl>,
+    @InjectRepository(Account)
+    private readonly accountsRepository: Repository<Account>,
     private readonly eventsService: EventsService,
     private readonly auditService: AuditService,
   ) {}
 
-  async freeze(cardToken: string, reason: string) {
-    const card = await this.findByToken(cardToken);
+  async listCards(userId: number, roles?: string[]) {
+    if (hasPrivilegedRole(roles)) {
+      return this.cardRepository.find({
+        order: { updatedAt: 'DESC' },
+      });
+    }
+
+    const accounts = await this.accountsRepository.find({
+      where: { userId },
+      select: ['id'],
+    });
+    const accountIds = accounts.map((account) => account.id);
+    if (accountIds.length === 0) {
+      return [];
+    }
+
+    return this.cardRepository.find({
+      where: accountIds.map((accountId) => ({ accountId })),
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  async freeze(cardToken: string, reason: string, userId: number, roles?: string[]) {
+    const card = await this.findAccessibleCard(cardToken, userId, roles);
     card.status = CardStatus.FROZEN;
     await this.cardRepository.save(card);
     const eventPayload = { event: 'CARD_FROZEN', cardToken, reason };
     this.eventsService.emit('card_controls_events', eventPayload);
-    await this.auditService.record('system', 'CARD_FROZEN', eventPayload);
+    await this.auditService.record(`user_${userId}`, 'CARD_FROZEN', eventPayload);
     return card;
   }
 
-  async unfreeze(cardToken: string) {
-    const card = await this.findByToken(cardToken);
+  async unfreeze(cardToken: string, userId: number, roles?: string[]) {
+    const card = await this.findAccessibleCard(cardToken, userId, roles);
     card.status = CardStatus.ACTIVE;
     await this.cardRepository.save(card);
     const eventPayload = { event: 'CARD_UNFROZEN', cardToken };
     this.eventsService.emit('card_controls_events', eventPayload);
-    await this.auditService.record('system', 'CARD_UNFROZEN', eventPayload);
+    await this.auditService.record(`user_${userId}`, 'CARD_UNFROZEN', eventPayload);
     return card;
   }
 
-  async updateLimits(cardToken: string, limits: Partial<CardControl>) {
-    const card = await this.findByToken(cardToken);
+  async updateLimits(
+    cardToken: string,
+    limits: Partial<CardControl>,
+    userId: number,
+    roles?: string[],
+  ) {
+    const card = await this.findAccessibleCard(cardToken, userId, roles);
     card.mccWhitelist = limits.mccWhitelist ?? card.mccWhitelist;
     card.geoWhitelist = limits.geoWhitelist ?? card.geoWhitelist;
     card.spendLimits = limits.spendLimits ?? card.spendLimits;
     const saved = await this.cardRepository.save(card);
-    await this.auditService.record('system', 'CARD_LIMITS_UPDATED', {
+    await this.auditService.record(`user_${userId}`, 'CARD_LIMITS_UPDATED', {
       cardToken,
       limits,
     });
@@ -55,9 +93,12 @@ export class CardControlsService {
   async registerCard(
     accountId: number,
     cardToken: string,
+    userId: number,
+    roles?: string[],
     panLast4?: string,
     panEncrypted?: string,
   ) {
+    await this.assertAccountAccess(accountId, userId, roles);
     const card = this.cardRepository.create({
       accountId,
       cardToken,
@@ -72,8 +113,18 @@ export class CardControlsService {
     amount: number,
     mcc?: number,
     geoLocation?: string,
+    userId?: number,
+    roles?: string[],
+    expectedAccountId?: number,
   ) {
-    const card = await this.findByToken(cardToken);
+    const card =
+      userId !== undefined
+        ? await this.findAccessibleCard(cardToken, userId, roles)
+        : await this.findByToken(cardToken);
+
+    if (expectedAccountId !== undefined && card.accountId !== expectedAccountId) {
+      throw new BadRequestException('Card token does not belong to the selected account.');
+    }
 
     if (card.status === CardStatus.FROZEN) {
       await this.auditService.record('system', 'CARD_TRANSACTION_REJECTED', {
@@ -174,5 +225,21 @@ export class CardControlsService {
       throw new NotFoundException('Card not found');
     }
     return card;
+  }
+
+  private async findAccessibleCard(cardToken: string, userId: number, roles?: string[]) {
+    const card = await this.findByToken(cardToken);
+    await this.assertAccountAccess(card.accountId, userId, roles);
+    return card;
+  }
+
+  private async assertAccountAccess(accountId: number, userId: number, roles?: string[]) {
+    const account = await this.accountsRepository.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+    if (account.userId !== userId && !hasPrivilegedRole(roles)) {
+      throw new ForbiddenException('You do not have access to this card');
+    }
   }
 }

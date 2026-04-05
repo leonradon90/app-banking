@@ -1,6 +1,8 @@
+import { randomUUID } from 'crypto';
+
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
+
 import { RetryService } from '../common/services/retry.service';
 
 export type InterbankTransferRequest = {
@@ -26,10 +28,10 @@ export class InterbankGatewayService {
     const retryBackoffMs = this.configService.get<number>('interbank.retryBackoffMs') ?? 250;
 
     if (mode !== 'real') {
-      return this.retryService.execute(
-        async () => this.stubTransfer(payload),
-        { attempts: retryAttempts, backoffMs: retryBackoffMs },
-      );
+      return this.retryService.execute(async () => this.stubTransfer(payload), {
+        attempts: retryAttempts,
+        backoffMs: retryBackoffMs,
+      });
     }
 
     return {

@@ -1,11 +1,14 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { readFileSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { readFileSync } from 'fs';
+
+import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { NextFunction, Request, Response } from 'express';
+
+import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
   const httpsEnabled = process.env.HTTPS_ENABLED === 'true';
@@ -40,14 +43,15 @@ async function bootstrap() {
 
   const traceEnabled = configService.get<boolean>('observability.traceEnabled') ?? true;
   if (traceEnabled) {
-    app.use((req: any, res: any, next: () => void) => {
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const requestWithTrace = req as Request & { traceId?: string };
       const traceId =
-        req.headers['x-trace-id'] ||
-        req.headers['idempotency-key'] ||
-        req.headers['x-request-id'] ||
+        requestWithTrace.headers['x-trace-id'] ||
+        requestWithTrace.headers['idempotency-key'] ||
+        requestWithTrace.headers['x-request-id'] ||
         randomUUID();
-      req.traceId = traceId;
-      res.setHeader('X-Trace-Id', traceId);
+      requestWithTrace.traceId = String(traceId);
+      res.setHeader('X-Trace-Id', String(traceId));
       next();
     });
   }

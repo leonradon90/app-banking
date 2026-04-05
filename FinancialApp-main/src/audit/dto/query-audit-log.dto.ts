@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, Max, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsInt, Min, Max, IsDateString } from 'class-validator';
 
 export class QueryAuditLogDto {
   @ApiProperty({ required: false, description: 'Фильтр по актору' })
@@ -35,7 +35,13 @@ export class QueryAuditLogDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiProperty({ required: false, description: 'Размер страницы', default: 20, minimum: 1, maximum: 100 })
+  @ApiProperty({
+    required: false,
+    description: 'Размер страницы',
+    default: 20,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -43,4 +49,3 @@ export class QueryAuditLogDto {
   @Max(100)
   limit?: number = 20;
 }
-

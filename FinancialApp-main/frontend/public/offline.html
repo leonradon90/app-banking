@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>ALTX Finance</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #071521;
+        --panel: rgba(255, 255, 255, 0.94);
+        --text: #0b1f35;
+        --muted: #5b6b7f;
+        --accent: #0f766e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(42rem circle at 15% 15%, rgba(15, 118, 110, 0.28), transparent 42%),
+          radial-gradient(30rem circle at 85% 0%, rgba(245, 158, 11, 0.18), transparent 38%),
+          var(--bg);
+        font-family: "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(100%, 420px);
+        border-radius: 28px;
+        background: var(--panel);
+        padding: 32px 28px;
+        box-shadow: 0 30px 60px -35px rgba(0, 0, 0, 0.6);
+      }
+
+      h1 {
+        margin: 0;
+        color: var(--text);
+        font-size: 1.9rem;
+      }
+
+      p {
+        margin: 12px 0 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 24px;
+        width: 100%;
+        padding: 14px 18px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>ALTX Finance is installed, but this screen needs a connection to refresh account data.</p>
+      <p>Reconnect to the internet and open the app again to load balances, transfers, and alerts.</p>
+      <a href="/">Try again</a>
+    </main>
+  </body>
+  </html>

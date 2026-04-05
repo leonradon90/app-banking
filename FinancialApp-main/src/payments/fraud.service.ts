@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { LedgerEntry } from '../ledger/entities/ledger-entry.entity';
-import { CreatePaymentDto } from './dto/create-payment.dto';
+
 import { AuditService } from '../audit/audit.service';
 import { EventsService } from '../events/events.service';
+import { LedgerEntry } from '../ledger/entities/ledger-entry.entity';
+
+import { CreatePaymentDto } from './dto/create-payment.dto';
 
 export interface FraudCheckResult {
   passed: boolean;
@@ -37,24 +39,18 @@ export class FraudService {
       reasons.push(velocityCheck.reason || 'High transaction frequency');
     }
 
-    const amountCheck = await this.checkTransactionAmount(
-      accountId,
-      dto.amount,
-      dto.currency,
-    );
+    const amountCheck = await this.checkTransactionAmount(accountId, dto.amount, dto.currency);
     if (!amountCheck.passed) {
       riskScore += amountCheck.riskScore;
       reasons.push(amountCheck.reason || 'Suspicious transaction amount');
     }
 
-    const patternCheck = await this.checkTransactionPattern(
-      accountId,
-      dto.toAccount,
-      dto.amount,
-    );
-    if (!patternCheck.passed) {
-      riskScore += patternCheck.riskScore;
-      reasons.push(patternCheck.reason || 'Suspicious transaction pattern');
+    if (dto.toAccount !== undefined && dto.toAccount !== null) {
+      const patternCheck = await this.checkTransactionPattern(accountId, dto.toAccount, dto.amount);
+      if (!patternCheck.passed) {
+        riskScore += patternCheck.riskScore;
+        reasons.push(patternCheck.reason || 'Suspicious transaction pattern');
+      }
     }
 
     const roundAmountCheck = this.checkRoundAmount(dto.amount);
@@ -102,9 +98,7 @@ export class FraudService {
     };
   }
 
-  private async checkTransactionVelocity(
-    accountId: number,
-  ): Promise<FraudCheckResult> {
+  private async checkTransactionVelocity(accountId: number): Promise<FraudCheckResult> {
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -189,9 +183,12 @@ export class FraudService {
 
   private async checkTransactionPattern(
     accountId: number,
-    toAccountId: number,
+    toAccountId: number | undefined,
     amount: number,
   ): Promise<FraudCheckResult> {
+    if (toAccountId === undefined || toAccountId === null) {
+      return { passed: true, riskScore: 0 };
+    }
     const last24Hours = new Date();
     last24Hours.setHours(last24Hours.getHours() - 24);
 

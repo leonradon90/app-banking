@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsEnum, IsNumber, IsOptional } from 'class-validator';
+
 import { LimitScope } from '../entities/limit-rule.entity';
 
 export class CreateLimitDto {

@@ -1,15 +1,17 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { OnEvent } from '@nestjs/event-emitter';
-import { NotificationPreference } from './entities/notification-preference.entity';
-import { Notification, NotificationType, NotificationStatus } from './entities/notification.entity';
+
 import { Account } from '../accounts/entities/account.entity';
 import { AuditService } from '../audit/audit.service';
-import { NotificationsDeliveryService } from './notifications.delivery';
-import { NotificationDevice } from './entities/notification-device.entity';
 import { EventsService } from '../events/events.service';
-import { ConfigService } from '@nestjs/config';
+
+import { NotificationDevice } from './entities/notification-device.entity';
+import { NotificationPreference } from './entities/notification-preference.entity';
+import { Notification, NotificationType, NotificationStatus } from './entities/notification.entity';
+import { NotificationsDeliveryService } from './notifications.delivery';
 
 export interface CreateNotificationDto {
   userId: number;
@@ -54,35 +56,49 @@ export class NotificationsService {
   }
 
   @OnEvent('transactions')
-  async handleTransactionEvent(payload: Record<string, any>) {
+  async handleTransactionEvent(payload: Record<string, unknown>) {
     if (this.kafkaConsumerActive) {
       return;
     }
     await this.processTransactionEvent(payload);
   }
 
-  async handleKafkaTransactionEvent(payload: Record<string, any>) {
+  async handleKafkaTransactionEvent(payload: Record<string, unknown>) {
     await this.processTransactionEvent(payload);
   }
 
-  private async processTransactionEvent(payload: Record<string, any>) {
+  private async processTransactionEvent(payload: Record<string, unknown>) {
     this.logger.log(`Push notification scheduled: ${JSON.stringify(payload)}`);
 
-    const debitAccountId = payload.debitAccountId;
-    const creditAccountId = payload.creditAccountId;
+    const parseNumber = (value: unknown): number | undefined => {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string' && value.trim() !== '') {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      }
+      return undefined;
+    };
+
+    const userId = parseNumber(payload.userId);
+    const debitAccountId = parseNumber(payload.debitAccountId);
+    const creditAccountId = parseNumber(payload.creditAccountId);
+    const amount = payload.amount;
+    const currency = payload.currency;
     const notifications: CreateNotificationDto[] = [];
 
-    if (payload.userId) {
+    if (userId !== undefined) {
       notifications.push({
-        userId: payload.userId,
+        userId,
         type: NotificationType.TRANSACTION,
         title: 'Transaction Completed',
-        message: `Transaction of ${payload.amount} ${payload.currency} has been processed`,
+        message: `Transaction of ${String(amount)} ${String(currency)} has been processed`,
         metadata: payload,
         channels: ['push', 'email', 'websocket'],
       });
-    } else if (debitAccountId || creditAccountId) {
-      const accountIds = [debitAccountId, creditAccountId].filter(Boolean);
+    } else if (debitAccountId !== undefined || creditAccountId !== undefined) {
+      const accountIds = [debitAccountId, creditAccountId].filter(
+        (id): id is number => id !== undefined,
+      );
       const accounts = accountIds.length
         ? await this.accountsRepository.find({ where: accountIds.map((id) => ({ id })) })
         : [];
@@ -164,9 +180,10 @@ export class NotificationsService {
       const enabledChannels = preferences?.channels || {};
 
       // Check if user has enabled notifications for this channel
-      const channelsToSend = notification.channels?.filter((channel) => {
-        return enabledChannels[channel] !== false;
-      }) || [];
+      const channelsToSend =
+        notification.channels?.filter((channel) => {
+          return enabledChannels[channel] !== false;
+        }) || [];
 
       if (channelsToSend.length === 0) {
         this.logger.log(`No enabled channels for notification ${notification.id}`);

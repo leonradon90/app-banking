@@ -1,6 +1,7 @@
+import { createCipheriv, createHash, createHmac, randomUUID } from 'crypto';
+
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createHash, createHmac, randomUUID } from 'crypto';
 
 export type TokenizationResult = {
   cardToken: string;
@@ -16,9 +17,7 @@ export class TokenizationService {
   tokenizePan(pan: string): TokenizationResult {
     const normalized = pan.replace(/\s+/g, '');
     const panLast4 = normalized.slice(-4);
-    const mode = (this.configService.get<string>('cardVault.mode') ?? 'stub') as
-      | 'stub'
-      | 'real';
+    const mode = (this.configService.get<string>('cardVault.mode') ?? 'stub') as 'stub' | 'real';
 
     const tokenSecret =
       this.configService.get<string>('cardVault.tokenizationSecret') ?? 'stub-token';
@@ -27,12 +26,9 @@ export class TokenizationService {
         ? createHmac('sha256', tokenSecret).update(normalized).digest('hex').slice(0, 32)
         : randomUUID();
 
-    const encryptionKey =
-      this.configService.get<string>('cardVault.encryptionKey') ?? '';
+    const encryptionKey = this.configService.get<string>('cardVault.encryptionKey') ?? '';
     const panEncrypted =
-      mode === 'real' && encryptionKey
-        ? this.encryptPan(normalized, encryptionKey)
-        : undefined;
+      mode === 'real' && encryptionKey ? this.encryptPan(normalized, encryptionKey) : undefined;
 
     return {
       cardToken,

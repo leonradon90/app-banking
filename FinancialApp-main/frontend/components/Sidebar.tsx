@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 type NavItem = {
@@ -20,6 +20,9 @@ const navItems: NavItem[] = [
   { href: '/limits', label: 'Limits', description: 'Spending rules and safety' },
   { href: '/kyc', label: 'Verification', description: 'Identity status and documents' },
 ];
+const mobileNavItems = navItems.filter(({ href }) =>
+  ['/dashboard', '/accounts', '/payments', '/notifications', '/card-controls'].includes(href)
+);
 
 const kycBadgeStyles: Record<string, string> = {
   VERIFIED: 'badge-green',
@@ -28,12 +31,43 @@ const kycBadgeStyles: Record<string, string> = {
   REJECTED: 'badge-red',
 };
 
-export function Sidebar() {
+type NavigationLinksProps = {
+  currentPath: string;
+  onNavigate?: () => void;
+  compact?: boolean;
+};
+
+function NavigationLinks({ currentPath, onNavigate, compact = false }: NavigationLinksProps) {
+  return (
+    <nav className={`flex flex-col ${compact ? 'gap-2' : 'gap-4'}`}>
+      {navItems.map(({ href, label, description }) => {
+        const isActive = currentPath === href;
+        return (
+          <Link
+            key={href}
+            href={href}
+            onClick={onNavigate}
+            className={`rounded-2xl border border-transparent px-4 py-3 transition-all ${
+              isActive
+                ? 'bg-white text-brand-secondary shadow-card ring-1 ring-brand-primary/30'
+                : 'hover:border-brand-primary/30 hover:bg-white/90'
+            }`}
+          >
+            <div className="text-sm font-semibold">{label}</div>
+            <div className="text-xs text-[var(--muted)]">{description}</div>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const { session, logout } = useAuth();
 
   return (
-    <aside className="relative z-10 flex h-full w-full max-w-xs flex-col gap-8 border-r border-white/60 bg-white/70 p-6 shadow-panel backdrop-blur-2xl">
+    <aside className="relative z-10 flex h-full w-full max-w-xs flex-col gap-8 border-r border-white/60 bg-white/70 p-6 shadow-panel backdrop-blur-2xl lg:h-screen">
       <div>
         <p className="tag bg-brand-primary/10 text-brand-primary">ALTX Finance</p>
         <h1 className="mt-3 text-2xl font-semibold text-brand-secondary">Everyday Banking</h1>
@@ -49,29 +83,14 @@ export function Sidebar() {
           </div>
         )}
       </div>
-      <nav className="flex flex-col gap-4">
-        {navItems.map(({ href, label, description }) => {
-          const isActive = router.pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`rounded-2xl border border-transparent px-4 py-3 transition-all ${
-                isActive
-                  ? 'bg-white text-brand-secondary shadow-card ring-1 ring-brand-primary/30'
-                  : 'hover:border-brand-primary/30 hover:bg-white/90'
-              }`}
-            >
-              <div className="text-sm font-semibold">{label}</div>
-              <div className="text-xs text-[var(--muted)]">{description}</div>
-            </Link>
-          );
-        })}
-      </nav>
+      <NavigationLinks currentPath={router.pathname} onNavigate={onNavigate} />
       {session && (
         <button
           type="button"
-          onClick={logout}
+          onClick={() => {
+            logout();
+            onNavigate?.();
+          }}
           className="btn-outline"
         >
           Log out
@@ -98,6 +117,7 @@ type LayoutProps = {
 export function Layout({ children, rightColumn, title, subtitle, requireAuth = true }: LayoutProps) {
   const router = useRouter();
   const { session, isReady } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const hasRightColumn = Boolean(rightColumn);
 
   useEffect(() => {
@@ -106,9 +126,13 @@ export function Layout({ children, rightColumn, title, subtitle, requireAuth = t
     }
   }, [requireAuth, isReady, session, router]);
 
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [router.pathname]);
+
   if (requireAuth && !session) {
     return (
-      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg)] p-10">
+      <div className="safe-area-top safe-area-bottom relative flex min-h-screen items-center justify-center overflow-hidden bg-[var(--bg)] p-6 sm:p-10">
         <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand-accent/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 left-12 h-80 w-80 rounded-full bg-brand-primary/15 blur-3xl" />
         <div className="glass-panel shadow-panel max-w-xl rounded-3xl border border-[var(--border)] p-8 text-center">
@@ -127,12 +151,47 @@ export function Layout({ children, rightColumn, title, subtitle, requireAuth = t
   }
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-[var(--bg)]">
+    <div className="relative min-h-screen overflow-hidden bg-[var(--bg)] lg:flex">
       <div className="pointer-events-none absolute -right-28 -top-20 h-72 w-72 rounded-full bg-brand-accent/20 blur-3xl" />
       <div className="pointer-events-none absolute -left-24 top-1/3 h-96 w-96 rounded-full bg-brand-primary/15 blur-3xl" />
-      <Sidebar />
-      <main className="relative z-10 flex min-w-0 flex-1 flex-col gap-6 p-10">
-        <header>
+      <div className="hidden lg:flex lg:shrink-0">
+        <Sidebar />
+      </div>
+      {isMenuOpen && (
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen(false)}
+          className="fixed inset-0 z-40 bg-brand-secondary/30 backdrop-blur-sm lg:hidden"
+          aria-label="Close navigation"
+        />
+      )}
+      <aside
+        className={`safe-area-top safe-area-bottom fixed inset-y-0 left-0 z-50 w-[min(84vw,22rem)] transition-transform duration-200 lg:hidden ${
+          isMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <Sidebar onNavigate={() => setIsMenuOpen(false)} />
+      </aside>
+      <main className="safe-area-top relative z-10 flex min-w-0 flex-1 flex-col gap-4 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pt-6 lg:gap-6 lg:p-10 lg:pb-10">
+        <header className="lg:hidden">
+          <div className="glass-panel flex items-center justify-between gap-3 rounded-3xl border border-[var(--border)] px-4 py-3 shadow-panel">
+            <div className="min-w-0">
+              <p className="truncate text-[11px] uppercase tracking-[0.2em] text-brand-primary/70">
+                {subtitle ?? 'Overview'}
+              </p>
+              <h2 className="truncate text-xl font-semibold text-brand-secondary">{title}</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(true)}
+              className="btn-outline h-11 min-w-11 px-4"
+              aria-label="Open navigation"
+            >
+              Menu
+            </button>
+          </div>
+        </header>
+        <header className="hidden lg:block">
           <p className="text-xs uppercase tracking-[0.2em] text-brand-primary/70">{subtitle ?? 'Overview'}</p>
           <h2 className="mt-2 text-3xl font-semibold text-brand-secondary">{title}</h2>
         </header>
@@ -153,6 +212,26 @@ export function Layout({ children, rightColumn, title, subtitle, requireAuth = t
           )}
         </div>
       </main>
+      <nav className="safe-area-bottom fixed inset-x-0 bottom-0 z-30 border-t border-white/60 bg-white/88 px-3 py-3 shadow-[0_-18px_40px_-32px_rgba(11,31,53,0.8)] backdrop-blur-2xl lg:hidden">
+        <div className="grid grid-cols-5 gap-2">
+          {mobileNavItems.map(({ href, label }) => {
+            const isActive = router.pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`rounded-2xl px-2 py-2 text-center text-[11px] font-semibold transition ${
+                  isActive
+                    ? 'bg-brand-primary text-white shadow-lg'
+                    : 'bg-white/70 text-brand-secondary'
+                }`}
+              >
+                {label}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

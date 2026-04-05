@@ -1,7 +1,9 @@
 import 'reflect-metadata';
 import 'dotenv/config';
 import { DataSource } from 'typeorm';
+
 import configuration from '../common/config/configuration';
+
 import { InitMigration0011700000000000 } from './migrations/001-init';
 import { AddNotificationsAndKycDocuments1700000000001 } from './migrations/002-add-notifications-and-kyc-documents';
 import { AddIdempotencyKeys1700000000002 } from './migrations/003-add-idempotency-keys';

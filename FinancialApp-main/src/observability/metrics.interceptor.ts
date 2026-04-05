@@ -1,8 +1,10 @@
+import { randomUUID } from 'crypto';
+
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable, catchError, tap, throwError } from 'rxjs';
+
 import { MetricsService } from './metrics.service';
 import { TelemetryService } from './telemetry.service';
-import { randomUUID } from 'crypto';
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {

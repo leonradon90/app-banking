@@ -1,3 +1,6 @@
+import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import {
   ConnectedSocket,
   OnGatewayConnection,
@@ -5,10 +8,7 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 
 @WebSocketGateway({
   cors: {

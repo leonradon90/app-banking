@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Kafka, Producer } from 'kafkajs';
-import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class EventsService implements OnModuleInit, OnModuleDestroy {
@@ -21,9 +21,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const brokers = this.configService.get<string[]>('kafka.brokers') ?? [
-      'localhost:9092',
-    ];
+    const brokers = this.configService.get<string[]>('kafka.brokers') ?? ['localhost:9092'];
     this.kafka = new Kafka({
       clientId: this.configService.get<string>('kafka.clientId'),
       brokers,
@@ -37,9 +35,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.producer) {
-      await this.producer.disconnect().catch((error) =>
-        this.logger.warn(`Kafka disconnect failed: ${error.message}`),
-      );
+      await this.producer
+        .disconnect()
+        .catch((error) => this.logger.warn(`Kafka disconnect failed: ${error.message}`));
     }
   }
 

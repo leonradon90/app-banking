@@ -10,11 +10,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
-import { NotificationsService } from './notifications.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { IsObject, IsString, Length, IsOptional } from 'class-validator';
+
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+
 import { NotificationType } from './entities/notification.entity';
+import { NotificationsService } from './notifications.service';
 
 class UpdateNotificationsDto {
   @IsObject()
@@ -75,6 +77,20 @@ export class NotificationsController {
     return this.notificationsService.registerDevice(user.userId, dto.token, dto.platform);
   }
 
+  @Post('preferences')
+  @ApiOperation({ summary: 'Update notification preferences' })
+  @ApiResponse({ status: 200, description: 'Preferences updated' })
+  update(@CurrentUser() user: CurrentUserPayload, @Body() dto: UpdateNotificationsDto) {
+    return this.notificationsService.upsertPreferences(user.userId, dto.channels);
+  }
+
+  @Get('preferences')
+  @ApiOperation({ summary: 'Get notification preferences' })
+  @ApiResponse({ status: 200, description: 'User notification preferences' })
+  get(@CurrentUser() user: CurrentUserPayload) {
+    return this.notificationsService.getPreferences(user.userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get notification by ID' })
   @ApiResponse({ status: 200, description: 'Notification found' })
@@ -96,19 +112,5 @@ export class NotificationsController {
   @ApiResponse({ status: 200, description: 'All notifications marked as read' })
   markAllAsRead(@CurrentUser() user: CurrentUserPayload) {
     return this.notificationsService.markAllAsRead(user.userId);
-  }
-
-  @Post('preferences')
-  @ApiOperation({ summary: 'Update notification preferences' })
-  @ApiResponse({ status: 200, description: 'Preferences updated' })
-  update(@CurrentUser() user: CurrentUserPayload, @Body() dto: UpdateNotificationsDto) {
-    return this.notificationsService.upsertPreferences(user.userId, dto.channels);
-  }
-
-  @Get('preferences')
-  @ApiOperation({ summary: 'Get notification preferences' })
-  @ApiResponse({ status: 200, description: 'User notification preferences' })
-  get(@CurrentUser() user: CurrentUserPayload) {
-    return this.notificationsService.getPreferences(user.userId);
   }
 }

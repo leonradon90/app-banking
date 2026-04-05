@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Layout } from '../components/Sidebar';
 import { apiRequest } from '../lib/api';
+import { useAuth } from '../hooks/useAuth';
 
 type LedgerEntry = {
   id: number;
@@ -22,12 +23,16 @@ type BalanceVerification = {
 
 export default function Ledger() {
   const router = useRouter();
+  const { session } = useAuth();
   const [accountId, setAccountId] = useState('');
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [verification, setVerification] = useState<BalanceVerification | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isReconciling, setReconciling] = useState(false);
   const [isLoading, setLoading] = useState(false);
+  const canReconcile = (session?.user.roles ?? []).some((role) =>
+    ['admin', 'compliance', 'system'].includes(role)
+  );
 
   const fetchLedger = useCallback(async (targetAccountId: string) => {
     setMessage(null);
@@ -141,15 +146,21 @@ export default function Ledger() {
             </div>
             {!verification.isConsistent && (
               <div className="mt-4 rounded-2xl border border-dashed border-brand-primary/40 bg-brand-primary/5 p-4 text-xs text-brand-secondary">
-                If the balance was created before transactions started, this can look off. You can add a one-time opening balance.
-                <button
-                  type="button"
-                  onClick={handleReconcile}
-                  disabled={isReconciling}
-                  className="btn-primary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isReconciling ? 'Reconciling...' : 'Post opening balance'}
-                </button>
+                {canReconcile ? (
+                  <>
+                    If the balance was created before transactions started, this can look off. You can add a one-time opening balance.
+                    <button
+                      type="button"
+                      onClick={handleReconcile}
+                      disabled={isReconciling}
+                      className="btn-primary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isReconciling ? 'Reconciling...' : 'Post opening balance'}
+                    </button>
+                  </>
+                ) : (
+                  'If this account needs a reconciliation adjustment, contact an administrator.'
+                )}
               </div>
             )}
           </section>

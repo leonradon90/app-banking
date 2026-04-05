@@ -13,14 +13,24 @@ interface LimitRule {
   createdAt: string;
 }
 
+interface AccountOption {
+  id: number;
+  currency: string;
+  balance: string;
+}
+
 const fallbackRules: LimitRule[] = [];
+const fallbackAccounts: AccountOption[] = [];
 
 export default function Limits() {
   const { data, refresh } = useApiResource<LimitRule[]>({ path: '/limits', fallbackData: fallbackRules });
+  const { data: accounts } = useApiResource<AccountOption[]>({
+    path: '/accounts',
+    fallbackData: fallbackAccounts,
+  });
   const [scope, setScope] = useState<LimitRule['scope']>('DAILY');
   const [threshold, setThreshold] = useState('');
   const [accountId, setAccountId] = useState('');
-  const [userId, setUserId] = useState('');
   const [active, setActive] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,13 +45,11 @@ export default function Limits() {
           scope,
           threshold: Number(threshold),
           ...(accountId ? { accountId: Number(accountId) } : {}),
-          ...(userId ? { userId: Number(userId) } : {}),
           active,
         },
       });
       setThreshold('');
       setAccountId('');
-      setUserId('');
       refresh();
       setMessage('Limit saved. You will be notified if it is reached.');
     } catch (error) {
@@ -66,7 +74,11 @@ export default function Limits() {
                     <div>
                       <p className="text-sm font-semibold text-brand-secondary">{rule.scope.replace('_', ' ')}</p>
                       <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
-                        {rule.accountId ? `Account ${rule.accountId}` : rule.userId ? `User ${rule.userId}` : 'Global'}
+                        {rule.accountId
+                          ? `Account ${rule.accountId}`
+                          : rule.userId
+                            ? 'Your profile'
+                            : 'Global safeguard'}
                       </p>
                     </div>
                     <span className="badge badge-amber">Limit {Number(rule.threshold).toLocaleString()}</span>
@@ -110,22 +122,19 @@ export default function Limits() {
               </div>
               <div>
                 <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Account ID (optional)</label>
-                <input
-                  type="number"
+                <select
                   value={accountId}
                   onChange={(event) => setAccountId(event.target.value)}
                   className="input-field mt-2"
-                />
+                >
+                  <option value="">All my accounts</option>
+                  {(accounts ?? fallbackAccounts).map((account) => (
+                    <option key={account.id} value={account.id}>
+                      #{account.id} - {account.currency} {Number(account.balance).toFixed(2)}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-            <div>
-              <label className="text-xs uppercase tracking-wide text-[var(--muted)]">User ID (optional)</label>
-              <input
-                type="number"
-                value={userId}
-                onChange={(event) => setUserId(event.target.value)}
-                className="input-field mt-2"
-              />
             </div>
             <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
               <input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />

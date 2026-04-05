@@ -1,20 +1,23 @@
+import { ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { PaymentsService } from './payments.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { v4 as uuid } from 'uuid';
+
+import { Account } from '../accounts/entities/account.entity';
+import { AuditService } from '../audit/audit.service';
+import { AuthService } from '../auth/auth.service';
+import { User } from '../auth/entities/user.entity';
+import { CardControlsService } from '../card-controls/card-controls.service';
+import { KycStatus } from '../kyc/kyc-status.enum';
 import { LedgerService } from '../ledger/ledger.service';
 import { LimitsService } from '../limits/limits.service';
-import { AuditService } from '../audit/audit.service';
-import { v4 as uuid } from 'uuid';
-import { FraudService } from './fraud.service';
-import { CardControlsService } from '../card-controls/card-controls.service';
 import { WebhooksService } from '../webhooks/webhooks.service';
-import { AuthService } from '../auth/auth.service';
-import { KycStatus } from '../kyc/kyc-status.enum';
-import { InterbankGatewayService } from './interbank.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Account } from '../accounts/entities/account.entity';
-import { User } from '../auth/entities/user.entity';
+
 import { PaymentSchedule } from './entities/payment-schedule.entity';
-import { ConfigService } from '@nestjs/config';
+import { FraudService } from './fraud.service';
+import { InterbankGatewayService } from './interbank.service';
+import { PaymentsService } from './payments.service';
 
 describe('PaymentsService', () => {
   let service: PaymentsService;
@@ -28,7 +31,12 @@ describe('PaymentsService', () => {
   const interbankGatewayService = { initiateTransfer: jest.fn() };
   const accountsRepository = { findOne: jest.fn(), save: jest.fn(), create: jest.fn() };
   const usersRepository = { findOne: jest.fn(), save: jest.fn(), create: jest.fn() };
-  const scheduleRepository = { find: jest.fn(), findOne: jest.fn(), save: jest.fn(), create: jest.fn() };
+  const scheduleRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+  };
   const configService = { get: jest.fn() };
 
   beforeEach(async () => {
@@ -57,6 +65,13 @@ describe('PaymentsService', () => {
     fraudService.validatePayment.mockResolvedValue({ passed: true, riskScore: 0 });
     webhooksService.notify.mockResolvedValue(undefined);
     authService.getUserById.mockResolvedValue({ id: 1, kycStatus: KycStatus.VERIFIED });
+    accountsRepository.findOne.mockResolvedValue({
+      id: 1,
+      userId: 1,
+      currency: 'USD',
+      balance: '500.00',
+      status: 'ACTIVE',
+    });
   });
 
   it('creates payments with ledger + audit', async () => {
@@ -90,5 +105,29 @@ describe('PaymentsService', () => {
     );
     expect(auditService.record).toHaveBeenCalled();
     expect('transactionId' in result ? result.transactionId : null).toEqual(42);
+  });
+
+  it('rejects payments from accounts that belong to another user', async () => {
+    accountsRepository.findOne.mockResolvedValueOnce({
+      id: 9,
+      userId: 2,
+      currency: 'USD',
+      balance: '500.00',
+      status: 'ACTIVE',
+    });
+
+    await expect(
+      service.createPayment(
+        {
+          fromAccount: 9,
+          toAccount: 2,
+          amount: 25,
+          currency: 'USD',
+          idempotencyKey: uuid(),
+        },
+        'user_1',
+        1,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

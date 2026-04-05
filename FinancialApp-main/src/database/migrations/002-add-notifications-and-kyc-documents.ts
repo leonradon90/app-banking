@@ -87,4 +87,3 @@ export class AddNotificationsAndKycDocuments1700000000001 implements MigrationIn
     await queryRunner.query(`DROP TYPE IF EXISTS notification_type;`);
   }
 }
-

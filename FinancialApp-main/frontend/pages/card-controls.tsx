@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Layout } from '../components/Sidebar';
 import { apiRequest } from '../lib/api';
+import { useApiResource } from '../hooks/useApiResource';
 
 type CardControl = {
   id: number;
@@ -13,7 +14,25 @@ type CardControl = {
   spendLimits: Record<string, unknown>;
 };
 
+type Account = {
+  id: number;
+  currency: string;
+  balance: string;
+  status: string;
+};
+
+const fallbackCards: CardControl[] = [];
+const fallbackAccounts: Account[] = [];
+
 export default function CardControls() {
+  const { data: cards, refresh: refreshCards } = useApiResource<CardControl[]>({
+    path: '/card-controls',
+    fallbackData: fallbackCards,
+  });
+  const { data: accounts } = useApiResource<Account[]>({
+    path: '/accounts',
+    fallbackData: fallbackAccounts,
+  });
   const [accountId, setAccountId] = useState('');
   const [cardToken, setCardToken] = useState('');
   const [pan, setPan] = useState('');
@@ -38,6 +57,7 @@ export default function CardControls() {
       });
       setLastCard(response);
       setSelectedToken(response.cardToken);
+      refreshCards();
       setMessage('Card added. You can now freeze it or set limits.');
     } catch (error) {
       setMessage((error as Error).message);
@@ -57,6 +77,7 @@ export default function CardControls() {
       });
       setLastCard(response);
       setSelectedToken(response.cardToken);
+      refreshCards();
       setMessage('Card saved.');
       setPan('');
     } catch (error) {
@@ -73,6 +94,7 @@ export default function CardControls() {
         body: { reason: 'user_request' },
       });
       setLastCard(response);
+      refreshCards();
       setMessage('Card frozen.');
     } catch (error) {
       setMessage((error as Error).message);
@@ -87,6 +109,7 @@ export default function CardControls() {
         method: 'POST',
       });
       setLastCard(response);
+      refreshCards();
       setMessage('Card unfrozen.');
     } catch (error) {
       setMessage((error as Error).message);
@@ -120,6 +143,7 @@ export default function CardControls() {
         },
       });
       setLastCard(response);
+      refreshCards();
       setMessage('Limits updated.');
     } catch (error) {
       setMessage((error as Error).message);
@@ -138,13 +162,20 @@ export default function CardControls() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Account ID</label>
-                <input
-                  type="number"
+                <select
                   value={accountId}
                   onChange={(event) => setAccountId(event.target.value)}
                   className="input-field mt-2"
-                  placeholder="101"
-                />
+                >
+                  <option value="">Select account</option>
+                  {(accounts ?? fallbackAccounts)
+                    .filter((account) => account.status === 'ACTIVE')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        #{account.id} - {account.currency} {Number(account.balance).toFixed(2)}
+                      </option>
+                    ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Card token</label>
@@ -159,6 +190,7 @@ export default function CardControls() {
             <button
               type="button"
               onClick={registerCard}
+              disabled={!accountId || !cardToken}
               className="btn-primary mt-6 w-full"
             >
               Add card
@@ -172,13 +204,20 @@ export default function CardControls() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div>
                 <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Account ID</label>
-                <input
-                  type="number"
+                <select
                   value={accountId}
                   onChange={(event) => setAccountId(event.target.value)}
                   className="input-field mt-2"
-                  placeholder="101"
-                />
+                >
+                  <option value="">Select account</option>
+                  {(accounts ?? fallbackAccounts)
+                    .filter((account) => account.status === 'ACTIVE')
+                    .map((account) => (
+                      <option key={account.id} value={account.id}>
+                        #{account.id} - {account.currency} {Number(account.balance).toFixed(2)}
+                      </option>
+                    ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Card number</label>
@@ -222,6 +261,21 @@ export default function CardControls() {
           <p className="mt-2 text-sm text-[var(--muted)]">
             Freeze a card instantly and set limits for safer spending.
           </p>
+          <div className="mt-6">
+            <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Saved cards</label>
+            <select
+              value={selectedToken}
+              onChange={(event) => setSelectedToken(event.target.value)}
+              className="input-field mt-2"
+            >
+              <option value="">Select card</option>
+              {(cards ?? fallbackCards).map((card) => (
+                <option key={card.id} value={card.cardToken}>
+                  {card.cardToken} - Account {card.accountId} - {card.status}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="mt-6 space-y-4">
             <div>
               <label className="text-xs uppercase tracking-wide text-[var(--muted)]">Card token</label>
@@ -302,6 +356,11 @@ export default function CardControls() {
               Update limits
             </button>
             {message && <p className="text-xs text-brand-secondary">{message}</p>}
+            {(cards ?? fallbackCards).length > 0 && (
+              <div className="rounded-2xl border border-dashed border-[var(--border)] bg-white/60 p-4 text-xs text-[var(--muted)]">
+                {cards?.length} saved card{cards?.length === 1 ? '' : 's'} available for instant controls.
+              </div>
+            )}
           </div>
         </section>
       </div>

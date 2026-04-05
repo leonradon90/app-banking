@@ -1,15 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsDateString,
+  IsEnum,
   IsNumber,
+  IsOptional,
   IsPositive,
   IsString,
   IsUUID,
   Length,
-  IsOptional,
-  Min,
   Max,
-  IsEnum,
-  IsDateString,
+  Min,
+  ValidateIf,
 } from 'class-validator';
 
 export enum TransferType {
@@ -23,8 +24,11 @@ export class CreatePaymentDto {
   fromAccount!: number;
 
   @ApiProperty({ required: false })
+  @ValidateIf(
+    (dto: CreatePaymentDto) =>
+      (dto.transferType ?? TransferType.INTERNAL) === TransferType.INTERNAL,
+  )
   @IsNumber()
-  @IsOptional()
   toAccount?: number;
 
   @ApiProperty()
@@ -50,13 +54,13 @@ export class CreatePaymentDto {
   transferType?: TransferType;
 
   @ApiProperty({ required: false, description: 'Beneficiary IBAN for interbank transfers' })
+  @ValidateIf((dto: CreatePaymentDto) => dto.transferType === TransferType.INTERBANK)
   @IsString()
-  @IsOptional()
   beneficiaryIban?: string;
 
   @ApiProperty({ required: false, description: 'Beneficiary bank name' })
+  @ValidateIf((dto: CreatePaymentDto) => dto.transferType === TransferType.INTERBANK)
   @IsString()
-  @IsOptional()
   beneficiaryBank?: string;
 
   @ApiProperty({ required: false, description: 'Schedule payment for a future ISO date' })

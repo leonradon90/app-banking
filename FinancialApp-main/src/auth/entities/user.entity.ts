@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+
 import { Account } from '../../accounts/entities/account.entity';
 import { KycStatus } from '../../kyc/kyc-status.enum';
 

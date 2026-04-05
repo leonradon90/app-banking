@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+
 import { EventsService } from './events.service';
 
 @Module({

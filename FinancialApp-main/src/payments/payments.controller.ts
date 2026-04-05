@@ -10,10 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { PaymentsService } from './payments.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { PaymentsService } from './payments.service';
 
 @ApiTags('payments')
 @ApiBearerAuth()
@@ -44,10 +46,7 @@ export class PaymentsController {
   }
 
   @Post('schedules/:id/cancel')
-  cancelSchedule(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: CurrentUserPayload,
-  ) {
+  cancelSchedule(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: CurrentUserPayload) {
     const actor = `user_${user.userId}`;
     return this.paymentsService.cancelSchedule(id, user.userId, actor);
   }

@@ -1,8 +1,10 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Kafka, Consumer } from 'kafkajs';
 import { ConfigService } from '@nestjs/config';
-import { NotificationsService } from './notifications.service';
+import { Kafka, Consumer } from 'kafkajs';
+
 import { verifyPayloadSignature } from '../common/utils/hmac';
+
+import { NotificationsService } from './notifications.service';
 
 @Injectable()
 export class NotificationsKafkaConsumer implements OnModuleInit, OnModuleDestroy {
@@ -75,8 +77,7 @@ export class NotificationsKafkaConsumer implements OnModuleInit, OnModuleDestroy
   }
 
   private verifyLedgerSignature(payload: Record<string, unknown>) {
-    const enabled =
-      this.configService.get<boolean>('ledger.eventSigningEnabled') ?? false;
+    const enabled = this.configService.get<boolean>('ledger.eventSigningEnabled') ?? false;
     const secret = this.configService.get<string>('ledger.eventSigningSecret') ?? '';
     if (!enabled || !secret) return true;
     return verifyPayloadSignature(payload, secret);

@@ -1,22 +1,25 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { LedgerService } from '../ledger/ledger.service';
-import { CreatePaymentDto, TransferType } from './dto/create-payment.dto';
-import { LimitsService } from '../limits/limits.service';
-import { AuditService } from '../audit/audit.service';
-import { FraudService } from './fraud.service';
-import { CardControlsService } from '../card-controls/card-controls.service';
-import { WebhooksService } from '../webhooks/webhooks.service';
-import { AuthService } from '../auth/auth.service';
-import { KycStatus } from '../kyc/kyc-status.enum';
-import { InterbankGatewayService } from './interbank.service';
-import { Account, AccountStatus } from '../accounts/entities/account.entity';
-import { User } from '../auth/entities/user.entity';
 import { randomUUID } from 'crypto';
-import * as bcrypt from 'bcrypt';
-import { PaymentSchedule, PaymentScheduleStatus } from './entities/payment-schedule.entity';
+
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
+import { Repository } from 'typeorm';
+
+import { Account, AccountStatus } from '../accounts/entities/account.entity';
+import { AuditService } from '../audit/audit.service';
+import { AuthService } from '../auth/auth.service';
+import { User } from '../auth/entities/user.entity';
+import { CardControlsService } from '../card-controls/card-controls.service';
+import { KycStatus } from '../kyc/kyc-status.enum';
+import { LedgerService } from '../ledger/ledger.service';
+import { LimitsService } from '../limits/limits.service';
+import { WebhooksService } from '../webhooks/webhooks.service';
+
+import { CreatePaymentDto, TransferType } from './dto/create-payment.dto';
+import { PaymentSchedule, PaymentScheduleStatus } from './entities/payment-schedule.entity';
+import { FraudService } from './fraud.service';
+import { InterbankGatewayService } from './interbank.service';
 
 @Injectable()
 export class PaymentsService {
@@ -43,9 +46,23 @@ export class PaymentsService {
     const scheduledFor = dto.scheduledFor ? new Date(dto.scheduledFor) : undefined;
     const transferType = dto.transferType ?? TransferType.INTERNAL;
 
-    if (transferType === TransferType.INTERNAL && (dto.toAccount === undefined || dto.toAccount === null)) {
+    if (
+      transferType === TransferType.INTERNAL &&
+      (dto.toAccount === undefined || dto.toAccount === null)
+    ) {
       throw new BadRequestException('Recipient account is required for internal transfers');
     }
+
+    if (
+      transferType === TransferType.INTERBANK &&
+      (!dto.beneficiaryIban?.trim() || !dto.beneficiaryBank?.trim())
+    ) {
+      throw new BadRequestException(
+        'Beneficiary IBAN and bank name are required for interbank transfers',
+      );
+    }
+
+    await this.ensureSourceAccountAccess(dto.fromAccount, userId);
 
     if (scheduledFor && Number.isNaN(scheduledFor.getTime())) {
       throw new BadRequestException('Invalid scheduledFor date');
@@ -106,6 +123,12 @@ export class PaymentsService {
     userId: number,
     traceId: string,
   ) {
+    const toAccountId = dto.toAccount;
+    if (toAccountId === undefined || toAccountId === null) {
+      throw new BadRequestException('Recipient account is required for internal transfers');
+    }
+
+    await this.ensureSourceAccountAccess(dto.fromAccount, userId);
     await this.ensureKycVerified(userId, actor, traceId);
     await this.fraudService.validatePayment(actor, dto, dto.fromAccount, traceId);
 
@@ -115,6 +138,9 @@ export class PaymentsService {
         dto.amount,
         dto.mcc,
         dto.geoLocation,
+        userId,
+        undefined,
+        dto.fromAccount,
       );
     }
 
@@ -123,7 +149,7 @@ export class PaymentsService {
     const ledgerEntry = await this.ledgerService.recordTransfer(
       {
         debitAccountId: dto.fromAccount,
-        creditAccountId: dto.toAccount,
+        creditAccountId: toAccountId,
         amount: dto.amount,
         currency: dto.currency,
         idempotencyKey: dto.idempotencyKey,
@@ -132,18 +158,23 @@ export class PaymentsService {
       actor,
     );
 
-    await this.auditService.record(actor, 'PAYMENT_COMPLETED', {
-      fromAccount: dto.fromAccount,
-      toAccount: dto.toAccount,
-      amount: dto.amount,
-      currency: dto.currency,
-      idempotencyKey: dto.idempotencyKey,
-      ledgerEntryId: ledgerEntry.id,
-      cardToken: dto.cardToken,
-      mcc: dto.mcc,
-      geoLocation: dto.geoLocation,
-      description: dto.description,
-    }, traceId);
+    await this.auditService.record(
+      actor,
+      'PAYMENT_COMPLETED',
+      {
+        fromAccount: dto.fromAccount,
+        toAccount: dto.toAccount,
+        amount: dto.amount,
+        currency: dto.currency,
+        idempotencyKey: dto.idempotencyKey,
+        ledgerEntryId: ledgerEntry.id,
+        cardToken: dto.cardToken,
+        mcc: dto.mcc,
+        geoLocation: dto.geoLocation,
+        description: dto.description,
+      },
+      traceId,
+    );
 
     await this.webhooksService.notify('PAYMENT_COMPLETED', {
       actor,
@@ -176,6 +207,13 @@ export class PaymentsService {
     userId: number,
     traceId: string,
   ) {
+    if (!dto.beneficiaryIban?.trim() || !dto.beneficiaryBank?.trim()) {
+      throw new BadRequestException(
+        'Beneficiary IBAN and bank name are required for interbank transfers',
+      );
+    }
+
+    await this.ensureSourceAccountAccess(dto.fromAccount, userId);
     await this.ensureKycVerified(userId, actor, traceId);
     await this.fraudService.validatePayment(actor, dto, dto.fromAccount, traceId);
     if (dto.cardToken) {
@@ -184,6 +222,9 @@ export class PaymentsService {
         dto.amount,
         dto.mcc,
         dto.geoLocation,
+        userId,
+        undefined,
+        dto.fromAccount,
       );
     }
     await this.limitsService.evaluate(actor, dto);
@@ -306,6 +347,17 @@ export class PaymentsService {
         message: `KYC status ${user.kycStatus} is not verified. Payment blocked.`,
       });
     }
+  }
+
+  private async ensureSourceAccountAccess(accountId: number, userId: number) {
+    const account = await this.accountsRepository.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new BadRequestException('Sender account not found');
+    }
+    if (account.userId !== userId) {
+      throw new ForbiddenException('You do not have access to the sender account');
+    }
+    return account;
   }
 
   private async getOrCreateClearingAccount(currency: string) {

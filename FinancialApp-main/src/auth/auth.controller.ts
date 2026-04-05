@@ -1,16 +1,18 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { IsOptional, IsString } from 'class-validator';
+import { Request } from 'express';
+
 import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { JwtRefreshGuard } from '../common/guards/jwt-refresh.guard';
+
+import { AuthService } from './auth.service';
+import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { RegisterDto } from './dto/register.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
-import { Request } from 'express';
 import { OAuthService } from './oauth.service';
-import { IsOptional, IsString } from 'class-validator';
 
 class OAuthTokenDto {
   @IsString()

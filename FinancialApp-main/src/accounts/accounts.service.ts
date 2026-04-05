@@ -1,14 +1,23 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
+
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { Account, AccountStatus } from './entities/account.entity';
-import { CreateAccountDto } from './dto/create-account.dto';
+import { Repository } from 'typeorm';
+
+import { AuditService } from '../audit/audit.service';
 import { User } from '../auth/entities/user.entity';
+import { hasPrivilegedRole } from '../common/utils/roles';
 import { KycStatus } from '../kyc/kyc-status.enum';
 import { LedgerService } from '../ledger/ledger.service';
-import { AuditService } from '../audit/audit.service';
+
+import { CreateAccountDto } from './dto/create-account.dto';
+import { Account, AccountStatus } from './entities/account.entity';
 
 @Injectable()
 export class AccountsService {
@@ -63,15 +72,29 @@ export class AccountsService {
     return account;
   }
 
+  async findAccessibleById(id: number, userId: number, roles?: string[]) {
+    const account = await this.findById(id);
+    if (account.userId !== userId && !hasPrivilegedRole(roles)) {
+      throw new ForbiddenException('You do not have access to this account');
+    }
+    return account;
+  }
+
   async findByUser(userId: number) {
     return this.accountsRepository.find({ where: { userId } });
   }
 
-  async fundAccount(accountId: number, amount: number, actor: string) {
+  async fundAccount(
+    accountId: number,
+    amount: number,
+    actor: string,
+    userId: number,
+    roles?: string[],
+  ) {
     if (amount <= 0) {
       throw new BadRequestException('Amount must be greater than zero');
     }
-    const account = await this.findById(accountId);
+    const account = await this.findAccessibleById(accountId, userId, roles);
     const systemAccount = await this.getOrCreateSystemAccount(account.currency);
     const entry = await this.ledgerService.recordTransfer(
       {

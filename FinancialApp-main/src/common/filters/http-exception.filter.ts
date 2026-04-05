@@ -9,9 +9,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const isHttpException = exception instanceof HttpException;
-    const status = isHttpException
-      ? exception.getStatus()
-      : HttpStatus.INTERNAL_SERVER_ERROR;
+    const status = isHttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const exceptionResponse = isHttpException ? exception.getResponse() : null;
     const payload =
@@ -20,8 +18,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         : (exceptionResponse as Record<string, unknown> | null);
 
     const messageRaw =
-      payload?.message ??
-      (exception instanceof Error ? exception.message : 'Unexpected error');
+      payload?.message ?? (exception instanceof Error ? exception.message : 'Unexpected error');
     const message = Array.isArray(messageRaw) ? messageRaw.join(', ') : String(messageRaw);
     const code = (payload?.code as string | undefined) ?? undefined;
 

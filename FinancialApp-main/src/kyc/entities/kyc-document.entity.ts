@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+
 import { User } from '../../auth/entities/user.entity';
 
 export enum DocumentType {

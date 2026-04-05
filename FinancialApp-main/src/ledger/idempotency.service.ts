@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
+
 import { LedgerEntry } from './entities/ledger-entry.entity';
 
 export interface IdempotencyResult<T> {
@@ -16,9 +17,7 @@ export class IdempotencyService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async checkIdempotency(
-    idempotencyKey: string,
-  ): Promise<IdempotencyResult<LedgerEntry>> {
+  async checkIdempotency(idempotencyKey: string): Promise<IdempotencyResult<LedgerEntry>> {
     const existing = await this.ledgerRepository.findOne({
       where: { idempotencyKey },
     });
@@ -37,7 +36,7 @@ export class IdempotencyService {
 
   async checkIdempotencyInTransaction(
     idempotencyKey: string,
-    manager: any,
+    manager: EntityManager,
   ): Promise<IdempotencyResult<LedgerEntry>> {
     const existing = await manager.findOne(LedgerEntry, {
       where: { idempotencyKey },
@@ -56,9 +55,7 @@ export class IdempotencyService {
   }
 
   validateIdempotencyKey(key: string): boolean {
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     return uuidRegex.test(key);
   }
 }
-

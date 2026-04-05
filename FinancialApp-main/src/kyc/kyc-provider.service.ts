@@ -1,6 +1,7 @@
+import { randomUUID } from 'crypto';
+
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
 
 export type KycProviderPayload = {
   userId: number;

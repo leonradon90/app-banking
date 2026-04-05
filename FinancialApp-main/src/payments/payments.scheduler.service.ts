@@ -1,15 +1,12 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
+
+import { AuditService } from '../audit/audit.service';
+
 import { PaymentSchedule, PaymentScheduleStatus } from './entities/payment-schedule.entity';
 import { PaymentsService } from './payments.service';
-import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class PaymentsSchedulerService implements OnModuleInit, OnModuleDestroy {
@@ -65,10 +62,15 @@ export class PaymentsSchedulerService implements OnModuleInit, OnModuleDestroy {
       schedule.processedAt = new Date();
       schedule.lastError = undefined;
       await this.scheduleRepository.save(schedule);
-      await this.auditService.record(schedule.actor, 'PAYMENT_SCHEDULED_EXECUTED', {
-        scheduleId: schedule.id,
-        ledgerEntryId: schedule.ledgerEntryId,
-      }, traceId);
+      await this.auditService.record(
+        schedule.actor,
+        'PAYMENT_SCHEDULED_EXECUTED',
+        {
+          scheduleId: schedule.id,
+          ledgerEntryId: schedule.ledgerEntryId,
+        },
+        traceId,
+      );
     } catch (error: unknown) {
       schedule.attempts += 1;
       schedule.lastError = error instanceof Error ? error.message : String(error);
@@ -83,11 +85,16 @@ export class PaymentsSchedulerService implements OnModuleInit, OnModuleDestroy {
       await this.scheduleRepository.save(schedule);
       this.logger.warn(`Scheduled payment ${schedule.id} failed: ${schedule.lastError}`);
       const traceId = (schedule.payload as { traceId?: string })?.traceId;
-      await this.auditService.record(schedule.actor, 'PAYMENT_SCHEDULED_FAILED', {
-        scheduleId: schedule.id,
-        attempts: schedule.attempts,
-        lastError: schedule.lastError,
-      }, traceId);
+      await this.auditService.record(
+        schedule.actor,
+        'PAYMENT_SCHEDULED_FAILED',
+        {
+          scheduleId: schedule.id,
+          attempts: schedule.attempts,
+          lastError: schedule.lastError,
+        },
+        traceId,
+      );
     }
   }
 }

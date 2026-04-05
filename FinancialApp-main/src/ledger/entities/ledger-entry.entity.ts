@@ -6,6 +6,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
+
 import { Account } from '../../accounts/entities/account.entity';
 
 @Entity({ name: 'ledger_entries' })

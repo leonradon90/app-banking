@@ -1,5 +1,6 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+
 import { MetricsService } from './metrics.service';
 
 @Controller('metrics')

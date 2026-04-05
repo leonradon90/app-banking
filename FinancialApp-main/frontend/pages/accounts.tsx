@@ -112,14 +112,19 @@ export default function Accounts() {
             <h3 className="text-sm font-semibold text-brand-secondary">Add funds</h3>
             <p className="mt-2 text-xs text-[var(--muted)]">Use this to top up an account for testing.</p>
             <form className="mt-4 space-y-3" onSubmit={handleFund}>
-              <input
-                type="number"
+              <select
                 value={fundAccountId}
                 onChange={(event) => setFundAccountId(event.target.value)}
-                placeholder="Account ID"
                 className="input-field"
                 required
-              />
+              >
+                <option value="">Select account</option>
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    #{account.id} - {account.currency} {Number(account.balance).toFixed(2)}
+                  </option>
+                ))}
+              </select>
               <input
                 type="number"
                 step="0.01"

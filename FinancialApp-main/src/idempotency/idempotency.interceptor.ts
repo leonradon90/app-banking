@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 import {
   BadRequestException,
   CallHandler,
@@ -6,11 +8,11 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { Observable, catchError, from, of, switchMap, tap, throwError } from 'rxjs';
-import { createHash } from 'crypto';
 import { Request, Response } from 'express';
-import { IdempotencyService } from './idempotency.service';
+import { Observable, catchError, from, of, switchMap, throwError } from 'rxjs';
+
 import { IdempotencyStatus } from './entities/idempotency-key.entity';
+import { IdempotencyService } from './idempotency.service';
 
 function stableStringify(value: unknown): string {
   if (value === null || value === undefined) return 'null';
@@ -48,8 +50,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
     }
 
     const endpoint = `${request.method.toUpperCase()} ${request.baseUrl || ''}${request.path}`;
+    const requestWithUser = request as Request & { user?: { userId?: string | number } };
     const scope =
-      (request as any).user?.userId?.toString() ??
+      requestWithUser.user?.userId?.toString() ??
       (request.body?.email as string | undefined) ??
       request.ip ??
       null;
@@ -90,19 +93,17 @@ export class IdempotencyInterceptor implements NestInterceptor {
         ).pipe(
           switchMap((record) =>
             next.handle().pipe(
-              tap(async (body) => {
-                await this.idempotencyService.markCompleted(
-                  record.id,
-                  response.statusCode,
-                  body,
-                );
-              }),
+              switchMap((body) =>
+                from(
+                  this.idempotencyService.markCompleted(record.id, response.statusCode, body),
+                ).pipe(switchMap(() => of(body))),
+              ),
               catchError((error) => {
                 const statusCode = (error?.status as number) ?? 500;
                 const body = error?.response ?? { message: error?.message ?? 'Request failed' };
-                return from(
-                  this.idempotencyService.markFailed(record.id, statusCode, body),
-                ).pipe(switchMap(() => throwError(() => error)));
+                return from(this.idempotencyService.markFailed(record.id, statusCode, body)).pipe(
+                  switchMap(() => throwError(() => error)),
+                );
               }),
             ),
           ),

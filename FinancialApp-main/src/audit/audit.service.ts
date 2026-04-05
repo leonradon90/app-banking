@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, Between } from 'typeorm';
-import { AuditLog } from './entities/audit-log.entity';
-import { QueryAuditLogDto } from './dto/query-audit-log.dto';
+import { Repository } from 'typeorm';
+
 import { AuditArchiveService } from './audit-archive.service';
+import { QueryAuditLogDto } from './dto/query-audit-log.dto';
+import { AuditLog } from './entities/audit-log.entity';
 
 export interface PaginatedAuditLogs {
   data: AuditLog[];
@@ -11,6 +12,11 @@ export interface PaginatedAuditLogs {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+export interface AuditAccessScope {
+  actor?: string;
+  privileged?: boolean;
 }
 
 @Injectable()
@@ -33,35 +39,14 @@ export class AuditService {
     return saved;
   }
 
-  async findLogs(query: QueryAuditLogDto): Promise<PaginatedAuditLogs> {
-    const {
-      actor,
-      action,
-      traceId,
-      startDate,
-      endDate,
-      page = 1,
-      limit = 20,
-    } = query;
-
-    const where: FindOptionsWhere<AuditLog> = {};
-
-    if (actor) {
-      where.actor = actor;
-    }
-
-    if (action) {
-      where.action = action;
-    }
-
-    if (traceId) {
-      where.traceId = traceId;
-    }
+  async findLogs(query: QueryAuditLogDto, scope?: AuditAccessScope): Promise<PaginatedAuditLogs> {
+    const { actor, action, traceId, startDate, endDate, page = 1, limit = 20 } = query;
+    const actorFilter = scope?.privileged ? actor : scope?.actor;
 
     const queryBuilder = this.auditRepository.createQueryBuilder('audit_log');
 
-    if (actor) {
-      queryBuilder.andWhere('audit_log.actor = :actor', { actor });
+    if (actorFilter) {
+      queryBuilder.andWhere('audit_log.actor = :actor', { actor: actorFilter });
     }
 
     if (action) {
@@ -102,24 +87,38 @@ export class AuditService {
     };
   }
 
-  async findLogsByTraceId(traceId: string): Promise<AuditLog[]> {
-    return this.auditRepository.find({
-      where: { traceId },
-      order: { createdAt: 'DESC' },
-    });
+  async findLogsByTraceId(traceId: string, scope?: AuditAccessScope): Promise<AuditLog[]> {
+    const queryBuilder = this.auditRepository
+      .createQueryBuilder('audit_log')
+      .where('audit_log.trace_id = :traceId', { traceId })
+      .orderBy('audit_log.created_at', 'DESC');
+
+    if (!scope?.privileged && scope?.actor) {
+      queryBuilder.andWhere('audit_log.actor = :actor', { actor: scope.actor });
+    }
+
+    return queryBuilder.getMany();
   }
 
-  async findById(id: number): Promise<AuditLog> {
+  async findById(id: number, scope?: AuditAccessScope): Promise<AuditLog> {
     const log = await this.auditRepository.findOne({ where: { id } });
 
     if (!log) {
       throw new NotFoundException(`Audit log with ID ${id} not found`);
     }
 
+    if (!scope?.privileged && scope?.actor && log.actor !== scope.actor) {
+      throw new ForbiddenException('You do not have access to this audit entry');
+    }
+
     return log;
   }
 
-  async getActionStats(startDate?: Date, endDate?: Date): Promise<
+  async getActionStats(
+    startDate?: Date,
+    endDate?: Date,
+    scope?: AuditAccessScope,
+  ): Promise<
     Array<{
       action: string;
       count: number;
@@ -130,6 +129,10 @@ export class AuditService {
       .select('audit_log.action', 'action')
       .addSelect('COUNT(*)', 'count')
       .groupBy('audit_log.action');
+
+    if (!scope?.privileged && scope?.actor) {
+      queryBuilder.andWhere('audit_log.actor = :actor', { actor: scope.actor });
+    }
 
     if (startDate) {
       queryBuilder.andWhere('audit_log.created_at >= :startDate', { startDate });

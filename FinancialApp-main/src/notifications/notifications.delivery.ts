@@ -1,12 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as admin from 'firebase-admin';
 import * as sendgrid from '@sendgrid/mail';
-import { Notification } from './entities/notification.entity';
-import { NotificationDevice } from './entities/notification-device.entity';
+import * as admin from 'firebase-admin';
+import { Repository } from 'typeorm';
+
 import { User } from '../auth/entities/user.entity';
+
+import { NotificationDevice } from './entities/notification-device.entity';
+import { Notification } from './entities/notification.entity';
 import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
@@ -24,9 +26,7 @@ export class NotificationsDeliveryService {
     private readonly userRepository: Repository<User>,
     private readonly gateway: NotificationsGateway,
   ) {
-    this.mode = (this.configService.get<string>('notifications.mode') ?? 'stub') as
-      | 'real'
-      | 'stub';
+    this.mode = (this.configService.get<string>('notifications.mode') ?? 'stub') as 'real' | 'stub';
     this.initFirebase();
     this.initSendgrid();
   }

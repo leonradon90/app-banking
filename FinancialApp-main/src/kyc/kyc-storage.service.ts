@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { randomUUID } from 'crypto';
+
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 export type KycStoragePayload = {
   userId: number;

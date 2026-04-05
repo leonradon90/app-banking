@@ -56,10 +56,8 @@ export class AppService {
           mode: this.configService.get<string>('cardVault.mode') ?? 'stub',
         },
         observability: {
-          metricsEnabled:
-            this.configService.get<boolean>('observability.metricsEnabled') ?? true,
-          traceEnabled:
-            this.configService.get<boolean>('observability.traceEnabled') ?? true,
+          metricsEnabled: this.configService.get<boolean>('observability.metricsEnabled') ?? true,
+          traceEnabled: this.configService.get<boolean>('observability.traceEnabled') ?? true,
         },
         ledger: {
           eventSigningEnabled:
@@ -71,8 +69,7 @@ export class AppService {
         ha: {
           postgresReplicaEnabled:
             this.configService.get<boolean>('ha.postgresReplicaEnabled') ?? false,
-          redisSentinelEnabled:
-            this.configService.get<boolean>('ha.redisSentinelEnabled') ?? false,
+          redisSentinelEnabled: this.configService.get<boolean>('ha.redisSentinelEnabled') ?? false,
           kafkaClusterBrokers: this.configService.get<string[]>('ha.kafkaClusterBrokers') ?? [],
         },
       },

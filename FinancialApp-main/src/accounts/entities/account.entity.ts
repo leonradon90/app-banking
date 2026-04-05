@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
   VersionColumn,
 } from 'typeorm';
+
 import { User } from '../../auth/entities/user.entity';
 import { LedgerEntry } from '../../ledger/entities/ledger-entry.entity';
 

@@ -1,12 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { User } from './entities/user.entity';
-import { RegisterDto } from './dto/register.dto';
+import { Repository } from 'typeorm';
+
 import { KycStatus } from '../kyc/kyc-status.enum';
+
+import { RegisterDto } from './dto/register.dto';
+import { User } from './entities/user.entity';
 
 @Injectable()
 export class AuthService {

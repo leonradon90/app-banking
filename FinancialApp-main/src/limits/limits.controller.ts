@@ -1,8 +1,11 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { LimitsService } from './limits.service';
-import { CreateLimitDto } from './dto/create-limit.dto';
+
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+
+import { CreateLimitDto } from './dto/create-limit.dto';
+import { LimitsService } from './limits.service';
 
 @ApiTags('limits')
 @ApiBearerAuth()
@@ -12,18 +15,23 @@ export class LimitsController {
   constructor(private readonly limitsService: LimitsService) {}
 
   @Post()
-  create(@Body() dto: CreateLimitDto) {
-    return this.limitsService.createRule({
-      scope: dto.scope,
-      threshold: dto.threshold.toFixed(2),
-      accountId: dto.accountId,
-      userId: dto.userId,
-      active: dto.active ?? true,
-    });
+  create(@Body() dto: CreateLimitDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.limitsService.createRule(
+      {
+        scope: dto.scope,
+        threshold: dto.threshold.toFixed(2),
+        accountId: dto.accountId,
+        userId: dto.userId,
+        active: dto.active ?? true,
+      },
+      user.userId,
+      `user_${user.userId}`,
+      user.roles,
+    );
   }
 
   @Get()
-  findAll() {
-    return this.limitsService.getRules();
+  findAll(@CurrentUser() user: CurrentUserPayload) {
+    return this.limitsService.getRules(user.userId, user.roles);
   }
 }

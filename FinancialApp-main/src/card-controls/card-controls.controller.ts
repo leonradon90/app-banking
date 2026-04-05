@@ -1,8 +1,11 @@
-import { Body, Controller, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { CardControlsService } from './card-controls.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { IsArray, IsNumber, IsOptional, IsString, Length } from 'class-validator';
+
+import { CurrentUser, CurrentUserPayload } from '../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+
+import { CardControlsService } from './card-controls.service';
 import { TokenizationService } from './tokenization.service';
 
 class RegisterCardDto {
@@ -55,34 +58,60 @@ export class CardControlsController {
     private readonly tokenizationService: TokenizationService,
   ) {}
 
+  @Get()
+  list(@CurrentUser() user: CurrentUserPayload) {
+    return this.cardControlsService.listCards(user.userId, user.roles);
+  }
+
   @Post('register')
-  register(@Body() dto: RegisterCardDto) {
-    return this.cardControlsService.registerCard(dto.accountId, dto.cardToken, dto.panLast4);
+  register(@Body() dto: RegisterCardDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.cardControlsService.registerCard(
+      dto.accountId,
+      dto.cardToken,
+      user.userId,
+      user.roles,
+      dto.panLast4,
+    );
   }
 
   @Post('tokenize')
-  tokenize(@Body() dto: TokenizeCardDto) {
+  tokenize(@Body() dto: TokenizeCardDto, @CurrentUser() user: CurrentUserPayload) {
     const result = this.tokenizationService.tokenizePan(dto.pan);
     return this.cardControlsService.registerCard(
       dto.accountId,
       result.cardToken,
+      user.userId,
+      user.roles,
       result.panLast4,
       result.panEncrypted,
     );
   }
 
   @Post(':cardToken/freeze')
-  freeze(@Param('cardToken') cardToken: string, @Body() dto: FreezeDto) {
-    return this.cardControlsService.freeze(cardToken, dto.reason ?? 'user_request');
+  freeze(
+    @Param('cardToken') cardToken: string,
+    @Body() dto: FreezeDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.cardControlsService.freeze(
+      cardToken,
+      dto.reason ?? 'user_request',
+      user.userId,
+      user.roles,
+    );
   }
 
   @Post(':cardToken/unfreeze')
-  unfreeze(@Param('cardToken') cardToken: string) {
-    return this.cardControlsService.unfreeze(cardToken);
+  unfreeze(@Param('cardToken') cardToken: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.cardControlsService.unfreeze(cardToken, user.userId, user.roles);
   }
 
   @Patch(':cardToken/limits')
-  updateLimits(@Param('cardToken') cardToken: string, @Body() dto: UpdateLimitsDto) {
-    return this.cardControlsService.updateLimits(cardToken, dto);
+  updateLimits(
+    @Param('cardToken') cardToken: string,
+    @Body() dto: UpdateLimitsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.cardControlsService.updateLimits(cardToken, dto, user.userId, user.roles);
   }
 }
